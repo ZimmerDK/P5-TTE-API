@@ -1,0 +1,28 @@
+@baseUrl = http://localhost:5073
+
+### Health
+GET {{baseUrl}}/health
+
+### Estimate route
+POST {{baseUrl}}/api/routes/estimate
+Content-Type: application/json
+
+{
+  "source": "A",
+  "destination": "B",
+  "waypoints": ["C", "D"],
+  "departureTime": "2026-09-24T08:30:00Z",
+  "mode": "car"
+}
+
+### Invalid estimate
+POST {{baseUrl}}/api/routes/estimate
+Content-Type: application/json
+
+{
+  "source": "",
+  "destination": "",
+  "waypoints": [],
+  "departureTime": "2026-09-24T08:30:00Z",
+  "mode": "car"
+}
