@@ -1,11 +1,13 @@
-# Time Estimation API
+DISCLAIMER: This document is currently primarily AI-generated. 
 
+# Time Estimation API
 Small ASP.NET Core API that estimates a route's travel time.
 
 ## What it does
-
-`POST /api/routes/estimate` takes a source, destination, optional waypoints,
-departure time, and travel mode. The API then:
+`POST /api/routes/estimate` takes an ordered list of route segments, departure
+time, and travel mode. For convenience during development it can also take a
+source, destination, and optional via locations and ask a routing provider to
+build the segments. The API then:
 
 1. asks the enabled route provider(s) for a route and its ordered segments;
 2. chooses the available primary result and records all provider results;
@@ -21,7 +23,18 @@ Example request:
 {
   "source": "Stockholm",
   "destination": "Gothenburg",
-  "waypoints": [],
+  "via": [],
+  "segments": [
+    {
+      "lengthMeters": 1000,
+      "speedLimitKmh": 50,
+      "laneCount": 2,
+      "isRoundabout": false,
+      "hasTrafficSignal": true,
+      "isIntersection": true,
+      "nodeIds": []
+    }
+  ],
   "departureTime": "2026-10-08T12:00:00Z",
   "mode": "car"
 }
@@ -32,8 +45,8 @@ selected `route`, provider results in `route.providerData`, and
 `route.missingData`.
 
 ## Current scope and important limitation
-
-The endpoint accepts named locations and optional user-selected via points.
+The canonical input is `segments`. Each segment is one road part in travel
+order. `via` is only for the optional provider-routing convenience path.
 The routing provider then creates the actual route geometry and ordered
 segments. A user via point is not the same thing as a provider-generated
 geometry point or road segment.
@@ -51,9 +64,7 @@ OSM is map data, not one single routing API. Nominatim geocodes names; OSRM
 and Valhalla calculate routes from map data.
 
 ## Running locally
-
 From this directory:
-
 ```powershell
 dotnet run --launch-profile http
 ```
@@ -62,25 +73,21 @@ The default local URL is `http://localhost:5073`. Requests are in
 [`TimeEstimationAPI.http`](./TimeEstimationAPI.http).
 
 Run tests from the repository root:
-
 ```powershell
 dotnet test .\TimeEstimationAPI.Tests\TimeEstimationAPI.Tests.csproj
 ```
 
 ## Providers
 
-### Development stub
-
-The default provider is a deterministic in-process stub. It does not call the
-internet. It returns a predictable distance based on the waypoint count,
-rough road metadata, and explicit missing fields. This keeps local tests
-repeatable, but its route is not real geography and must not be used as a
-real-world ETA.
+### Development provider
+The default provider is a deterministic in-process development provider. It
+does not call the internet. It creates one predictable segment per route leg,
+divides a fixed synthetic distance across those segments, and reports explicit
+missing fields. This keeps local tests repeatable, but its route is not real
+geography and must not be used as a real-world ETA.
 
 ### OSRM and Nominatim
-
 Enable OSRM with:
-
 ```powershell
 $env:Osm__UseOsrm = "true"
 dotnet run --no-launch-profile
@@ -98,9 +105,7 @@ signals. Road type, speed limit, and lane count are still missing because
 they are not reliably present in the current OSRM response.
 
 ### Valhalla
-
 Enable a local Valhalla service with:
-
 ```powershell
 $env:Valhalla__Enabled = "true"
 $env:Osm__UseOsrm = "true"
@@ -125,9 +130,7 @@ Valhalla server must already be running with map tiles. The API currently does
 not download PBF files or build Valhalla tiles.
 
 ## Model
-
 Development uses the placeholder by default:
-
 ```json
 "Model": {
   "UsePlaceholder": true,
@@ -140,16 +143,16 @@ speed, plus a small signal-delay assumption when signal data exists. It is not
 traffic data and it is not a trained model.
 
 To try an ONNX model:
-
 ```powershell
 $env:Model__UsePlaceholder = "false"
 dotnet run --no-launch-profile
 ```
 
-`ModelPath` defaults to `best_model.onnx`. The file is loaded only when
-`UsePlaceholder` is `false`. Matching tensor shapes are not enough to prove
-that an old model is scientifically compatible: feature order, scaling,
-training data, target units, and output meaning must also match.
+An ONNX model can be supplied later by setting `ModelPath` and
+`UsePlaceholder` to `false`. The old `best_model.onnx` from another project is
+not included or used. Matching tensor shapes are not enough to prove that a
+model is scientifically compatible: feature order, scaling, training data,
+target units, and output meaning must also match.
 
 The current feature mapping is in
 [`FeatureTransformer.cs`](./Services/FeatureTransformer.cs). Every segment
@@ -163,12 +166,11 @@ The exact sequence length and feature ordering still need confirmation from
 the ML team.
 
 ## Main files
-
 - `Program.cs` — dependency injection and the two HTTP endpoints.
 - `Models/RouteRequest.cs` — request JSON shape and basic limits.
 - `Models/UnifiedRoute.cs` — canonical route data, geometry, segments, and provider provenance.
 - `Services/RouteDataCollector.cs` — calls providers and chooses the route.
-- `Services/RouteProvider.cs` — provider contract, OSRM adapter, and stub.
+- `Services/RouteProvider.cs` — provider contract, OSRM adapter, and development provider.
 - `Services/ValhallaService.cs` — Valhalla adapter.
 - `Services/FeatureTransformer.cs` — maps route data to model numbers.
 - `Services/ModelRunner.cs` — ONNX loading or placeholder prediction.
@@ -178,3 +180,11 @@ the ML team.
 The project intentionally does not include Google benchmarking or a scheduled
 map-download job. Those are useful later, but they are not required to return
 an estimate and would make the core API harder to understand.
+
+## Open TODOs
+The repository-root [`TODO.md`](../TODO.md) contains the important unresolved
+design decisions. In particular, do not assume that the current
+`RouteSegment` objects are the final model segments: first confirm whether the
+ML model uses Valhalla maneuvers, Valhalla edges, OSM ways, or another unit.
+That file also tracks local Valhalla setup, model feature normalization, and
+UTC versus local-time semantics.

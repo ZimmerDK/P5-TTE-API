@@ -9,7 +9,7 @@ namespace TimeEstimationAPI.Services;
 public sealed class RouteModelOptions
 {
     public bool UsePlaceholder { get; set; }
-    public string ModelPath { get; set; } = "best_model.onnx";
+    public string? ModelPath { get; set; }
     public double PlaceholderAverageSpeedKmh { get; set; } = 40;
 }
 
@@ -28,15 +28,21 @@ public sealed class TravelTimeModelRunner
         ILogger<TravelTimeModelRunner> logger)
     {
         _options = options.Value;
-        var modelPath = Path.IsPathRooted(options.Value.ModelPath)
-            ? options.Value.ModelPath
-            : Path.Combine(AppContext.BaseDirectory, options.Value.ModelPath);
-
         if (options.Value.UsePlaceholder)
         {
             logger.LogWarning("Placeholder route model is enabled; ONNX inference is disabled.");
             return;
         }
+
+        if (string.IsNullOrWhiteSpace(options.Value.ModelPath))
+        {
+            logger.LogWarning("No ONNX model path is configured. Using the placeholder model.");
+            return;
+        }
+
+        var modelPath = Path.IsPathRooted(options.Value.ModelPath)
+            ? options.Value.ModelPath
+            : Path.Combine(AppContext.BaseDirectory, options.Value.ModelPath);
 
         if (!File.Exists(modelPath))
         {
@@ -77,6 +83,27 @@ public sealed class TravelTimeModelRunner
             return PredictWithPlaceholder(featureVector, _options);
         }
 
+        var output = RunOnnx(featureVector);
+        return output.Length > 0 ? output[0] : 0d;
+    }
+
+    /// <summary>
+    /// Returns one prediction per segment when the loaded model supplies one.
+    /// The placeholder always can because it is explicitly segment-based.
+    /// </summary>
+    public IReadOnlyList<double?> PredictSegments(RouteFeatureVector featureVector)
+    {
+        if (_session is null)
+            return PredictPlaceholderSegments(featureVector, _options).Cast<double?>().ToArray();
+
+        var output = RunOnnx(featureVector);
+        return output.Length == featureVector.Sequence.Length
+            ? output.Select(value => (double?)value).ToArray()
+            : Enumerable.Repeat<double?>(null, featureVector.Sequence.Length).ToArray();
+    }
+
+    private float[] RunOnnx(RouteFeatureVector featureVector)
+    {
         var featureTensor = new DenseTensor<float>(new[] { 1, _sequenceLength, _sequenceFeatureCount });
         for (var row = 0; row < featureVector.Sequence.Length && row < _sequenceLength; row++)
         {
@@ -98,9 +125,8 @@ public sealed class TravelTimeModelRunner
             NamedOnnxValue.CreateFromTensor("time_features", timeTensor)
         };
 
-        using var results = _session.Run(inputs);
-        var output = results.First().AsTensor<float>().ToArray();
-        return output.Length > 0 ? output[0] : 0d;
+        using var results = _session!.Run(inputs);
+        return results.First().AsTensor<float>().ToArray();
     }
 
     // Just enough to keep the full API flow usable before the real model arrives.
@@ -109,17 +135,27 @@ public sealed class TravelTimeModelRunner
         RouteModelOptions options)
     {
         // This is a transparent baseline, not a trained prediction.
-        var totalSeconds = 0d;
-        foreach (var segment in featureVector.Sequence)
+        return PredictPlaceholderSegments(featureVector, options).Sum();
+    }
+
+    private static double[] PredictPlaceholderSegments(
+        RouteFeatureVector featureVector,
+        RouteModelOptions options)
+    {
+        var predictions = new double[featureVector.Sequence.Length];
+        for (var index = 0; index < featureVector.Sequence.Length; index++)
         {
+            var segment = featureVector.Sequence[index];
             var distanceKm = Math.Max(segment.ElementAtOrDefault(0), 0);
             var speedKmh = segment.ElementAtOrDefault(1) * 130;
             speedKmh = speedKmh > 0 ? speedKmh : Math.Max(options.PlaceholderAverageSpeedKmh, 1);
             var signalDelaySeconds = segment.ElementAtOrDefault(5) * 10;
             var roundaboutDelaySeconds = segment.ElementAtOrDefault(4) * 5;
-            totalSeconds += distanceKm / speedKmh * 3600 + signalDelaySeconds + roundaboutDelaySeconds;
+            predictions[index] = distanceKm / speedKmh * 3600
+                + signalDelaySeconds
+                + roundaboutDelaySeconds;
         }
 
-        return totalSeconds;
+        return predictions;
     }
 }

@@ -10,7 +10,7 @@ Content-Type: application/json
 {
   "source": "A",
   "destination": "B",
-  "waypoints": ["C", "D"],
+  "via": ["C", "D"],
   "departureTime": "2026-09-24T08:30:00Z",
   "mode": "car"
 }
@@ -22,7 +22,7 @@ Content-Type: application/json
 {
   "source": "",
   "destination": "",
-  "waypoints": [],
+  "via": [],
   "departureTime": "2026-09-24T08:30:00Z",
   "mode": "car"
 }

@@ -16,6 +16,7 @@ public sealed record RouteSegment
     public bool? HasTrafficSignal { get; init; }
     public bool? IsIntersection { get; init; }
     public IReadOnlyCollection<string> MissingData { get; init; } = [];
+    public double? PredictedDurationSeconds { get; init; }
 }
 
 /// <summary>One provider's observations about a route.</summary>
@@ -42,7 +43,7 @@ public sealed record UnifiedRoute
 {
     public required string Source { get; init; }
     public required string Destination { get; init; }
-    public IReadOnlyList<string> Waypoints { get; init; } = [];
+    public IReadOnlyList<string> Via { get; init; } = [];
     public IReadOnlyList<RoutePoint> Geometry { get; init; } = [];
     public IReadOnlyList<RouteSegment> Segments { get; init; } = [];
     public DateTimeOffset DepartureTime { get; init; }

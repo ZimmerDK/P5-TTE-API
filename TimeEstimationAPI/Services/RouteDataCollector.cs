@@ -11,13 +11,17 @@ public sealed class RouteDataCollector(
     /// <summary>Collects route data and records which fields were not available.</summary>
     public async Task<UnifiedRoute> CollectAsync(RouteRequest request, CancellationToken cancellationToken)
     {
+        var source = request.Source
+            ?? throw new ArgumentException("Source is required when routing from locations.");
+        var destination = request.Destination
+            ?? throw new ArgumentException("Destination is required when routing from locations.");
         var providerData = new List<RouteProviderData>();
         foreach (var provider in providers)
         {
             try
             {
                 var data = await provider.GetRouteMetadataAsync(
-                    request.Source, request.Destination, request.Waypoints, cancellationToken);
+                    source, destination, request.Via, cancellationToken);
                 providerData.Add(ToProviderData(data));
             }
             catch (HttpRequestException exception)
@@ -47,9 +51,9 @@ public sealed class RouteDataCollector(
 
         return new UnifiedRoute
         {
-            Source = request.Source,
-            Destination = request.Destination,
-            Waypoints = request.Waypoints,
+            Source = source,
+            Destination = destination,
+            Via = request.Via,
             DepartureTime = request.DepartureTime,
             Mode = request.Mode,
             DistanceMeters = primary.DistanceMeters,
@@ -64,7 +68,7 @@ public sealed class RouteDataCollector(
         };
     }
 
-    private static RouteProviderData ToProviderData(OsmRouteMetadata data)
+    private static RouteProviderData ToProviderData(ProviderRouteResult data)
     {
         return new RouteProviderData
         {

@@ -29,14 +29,14 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         {
             source = "A",
             destination = "B",
-            waypoints = new[] { "C", "D" },
+            via = new[] { "C", "D" },
             departureTime = "2026-09-24T08:30:00Z",
             mode = "car"
         });
 
         response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal(2, document.RootElement.GetProperty("features").GetProperty("waypointsCount").GetInt32());
+        Assert.Equal(2, document.RootElement.GetProperty("features").GetProperty("viaCount").GetInt32());
         Assert.Equal(3, document.RootElement.GetProperty("route").GetProperty("segments").GetArrayLength());
     }
 
@@ -47,7 +47,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         {
             source = "Stockholm",
             destination = "Gothenburg",
-            waypoints = Array.Empty<string>(),
+            via = Array.Empty<string>(),
             departureTime = "2026-10-08T12:00:00Z",
             mode = "car"
         });
@@ -72,11 +72,52 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         {
             source = "",
             destination = "",
-            waypoints = Array.Empty<string>(),
+            via = Array.Empty<string>(),
             departureTime = "2026-09-24T08:30:00Z",
             mode = "car"
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Estimate_accepts_an_ordered_segment_route()
+    {
+        var response = await _client.PostAsJsonAsync("/api/routes/estimate", new
+        {
+            segments = new[]
+            {
+                new
+                {
+                    lengthMeters = 1000,
+                    speedLimitKmh = 50,
+                    laneCount = 2,
+                    isRoundabout = false,
+                    hasTrafficSignal = true,
+                    isIntersection = true,
+                    nodeIds = new[] { 10L, 11L }
+                },
+                new
+                {
+                    lengthMeters = 500,
+                    speedLimitKmh = 30,
+                    laneCount = 1,
+                    isRoundabout = true,
+                    hasTrafficSignal = false,
+                    isIntersection = true,
+                    nodeIds = new[] { 11L, 12L }
+                }
+            },
+            departureTime = "2026-09-24T08:30:00Z",
+            mode = "car"
+        });
+
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        Assert.Equal(2, root.GetProperty("route").GetProperty("segments").GetArrayLength());
+        Assert.All(root.GetProperty("route").GetProperty("segments").EnumerateArray(),
+            segment => Assert.True(segment.GetProperty("predictedDurationSeconds").GetDouble() > 0));
+        Assert.True(root.GetProperty("estimatedTravelTimeSeconds").GetDouble() > 0);
     }
 }

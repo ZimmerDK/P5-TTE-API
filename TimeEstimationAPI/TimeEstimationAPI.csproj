@@ -11,10 +11,4 @@
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
   </ItemGroup>
 
-  <ItemGroup>
-  <None Include="best_model.onnx">
-    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-  </None>
-</ItemGroup>
-
-</Project>
+  </Project>

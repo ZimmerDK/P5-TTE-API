@@ -5,7 +5,6 @@ public sealed class RouteResponse
 {
     public double EstimatedTravelTimeSeconds { get; set; }
     public double DistanceMeters { get; set; }
-    public double Confidence { get; set; }
     public string ModelName { get; set; } = "route_time_model_v1";
     public UnifiedRoute? Route { get; set; }
     public Dictionary<string, object> Features { get; set; } = new();

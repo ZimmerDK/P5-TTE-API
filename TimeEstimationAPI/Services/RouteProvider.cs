@@ -10,7 +10,7 @@ public interface IRouteProvider
 {
     string Name { get; }
 
-    Task<OsmRouteMetadata> GetRouteMetadataAsync(
+    Task<ProviderRouteResult> GetRouteMetadataAsync(
         string source,
         string destination,
         List<string>? waypoints,
@@ -18,7 +18,7 @@ public interface IRouteProvider
 }
 
 /// <summary>Common route data returned by a routing provider.</summary>
-public sealed class OsmRouteMetadata
+public sealed class ProviderRouteResult
 {
     public string Provider { get; set; } = "OSRM";
     public double? DistanceMeters { get; set; }
@@ -46,7 +46,7 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
     private readonly OsmOptions _options = options.Value;
     public string Name => "OSRM";
 
-    public async Task<OsmRouteMetadata> GetRouteMetadataAsync(
+    public async Task<ProviderRouteResult> GetRouteMetadataAsync(
         string source,
         string destination,
         List<string>? waypoints,
@@ -71,7 +71,7 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
             throw new InvalidOperationException("The route provider returned no routes.");
 
         var segments = ParseSteps(route);
-        return new OsmRouteMetadata
+        return new ProviderRouteResult
         {
             Provider = Name,
             DistanceMeters = route.GetProperty("distance").GetDouble(),
@@ -112,10 +112,9 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
                     IsRoundabout = isRoundabout,
                     HasTrafficSignal = hasSignal,
                     IsIntersection = intersections.Length > 1,
-                    NodeIds = GetNodeIds(step),
                     MissingData = laneCount > 0
-                        ? ["roadType", "speedLimitKmh"]
-                        : ["roadType", "speedLimitKmh", "laneCount"]
+                        ? ["roadType", "speedLimitKmh", "nodeIds"]
+                        : ["roadType", "speedLimitKmh", "laneCount", "nodeIds"]
                 });
             }
         }
@@ -132,19 +131,6 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
         if (intersection.TryGetProperty("lanes", out var lanes) &&
             lanes.ValueKind == JsonValueKind.Array)
             yield return lanes.GetArrayLength();
-    }
-
-    private static IReadOnlyList<long> GetNodeIds(JsonElement step)
-    {
-        if (!step.TryGetProperty("annotation", out var annotation) ||
-            !annotation.TryGetProperty("nodes", out var nodes) ||
-            nodes.ValueKind != JsonValueKind.Array)
-            return [];
-
-        return nodes.EnumerateArray()
-            .Where(node => node.ValueKind == JsonValueKind.Number && node.TryGetInt64(out _))
-            .Select(node => node.GetInt64())
-            .ToArray();
     }
 
     private static int CountTrafficSignals(IEnumerable<RouteSegment> segments) =>
@@ -191,11 +177,11 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
 }
 
 /// <summary>Predictable offline provider used for local development and tests.</summary>
-public sealed class OSMServiceStub : IRouteProvider
+public sealed class DevelopmentRouteProvider : IRouteProvider
 {
     public string Name => "development-stub";
 
-    public Task<OsmRouteMetadata> GetRouteMetadataAsync(
+    public Task<ProviderRouteResult> GetRouteMetadataAsync(
         string source,
         string destination,
         List<string>? waypoints,
@@ -214,7 +200,7 @@ public sealed class OSMServiceStub : IRouteProvider
             })
             .ToArray();
 
-        return Task.FromResult(new OsmRouteMetadata
+        return Task.FromResult(new ProviderRouteResult
         {
             Provider = Name,
             DistanceMeters = 6500,

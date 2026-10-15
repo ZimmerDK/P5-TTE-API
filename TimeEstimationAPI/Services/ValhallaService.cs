@@ -22,7 +22,7 @@ public sealed class ValhallaService(
     private readonly ValhallaOptions _options = options.Value;
     public string Name => "Valhalla";
 
-    public async Task<OsmRouteMetadata> GetRouteMetadataAsync(
+    public async Task<ProviderRouteResult> GetRouteMetadataAsync(
         string source,
         string destination,
         List<string>? waypoints,
@@ -55,7 +55,7 @@ public sealed class ValhallaService(
         var summary = document.RootElement.GetProperty("trip").GetProperty("summary");
         var trip = document.RootElement.GetProperty("trip");
         var segments = ParseManeuvers(trip);
-        return new OsmRouteMetadata
+        return new ProviderRouteResult
         {
             Provider = Name,
             DistanceMeters = summary.GetProperty("length").GetDouble() * 1000,

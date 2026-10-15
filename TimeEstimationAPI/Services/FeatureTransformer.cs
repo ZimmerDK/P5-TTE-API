@@ -7,6 +7,8 @@ public sealed class FeatureTransformer
 {
     public RouteFeatureVector Transform(UnifiedRoute route)
     {
+        // TODO(ML): Confirm whether MLM training uses UTC, the route's local timezone, or another explicit timezone. 
+        // To avoid silently changing behavior, this currently uses the machine's local timezone.
         var localTime = route.DepartureTime.ToLocalTime();
         var hour = localTime.Hour + localTime.Minute / 60.0;
         var minute = localTime.Minute + localTime.Second / 60.0;
@@ -35,6 +37,7 @@ public sealed class FeatureTransformer
             .OrderBy(segment => segment.Sequence)
             .Select(segment => new[]
             {
+                // TODO(ML): Replace every provisional unit, clamp, divisor, and category code below with the training pipeline's exact schtuff.
                 Math.Max(segment.LengthMeters ?? 0, 0) / 1000.0,
                 Math.Clamp(segment.SpeedLimitKmh ?? 0, 0, 130) / 130.0,
                 RoadTypeCode(segment.RoadType),

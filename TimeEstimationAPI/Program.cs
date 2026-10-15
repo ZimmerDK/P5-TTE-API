@@ -37,7 +37,7 @@ builder.Services.AddSingleton<IEnumerable<IRouteProvider>>(serviceProvider =>
 
     providers.Add(osmOptions.UseOsrm
         ? serviceProvider.GetRequiredService<OsrmService>()
-        : new OSMServiceStub());
+        : new DevelopmentRouteProvider());
     return providers;
 });
 builder.Services.AddSingleton<RouteDataCollector>();
@@ -59,24 +59,29 @@ if (app.Environment.IsDevelopment())
 // Main route estimate endpoint: collect data, run the model, return the estimate and route used.
 app.MapPost("/api/routes/estimate", async (RouteRequest request, ModelService modelService, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
-    if (string.IsNullOrWhiteSpace(request.Source) || string.IsNullOrWhiteSpace(request.Destination))
+    if (request.Segments.Count == 0 &&
+        (string.IsNullOrWhiteSpace(request.Source) || string.IsNullOrWhiteSpace(request.Destination)))
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
-            ["source"] = ["Source is required."],
-            ["destination"] = ["Destination is required."]
+            ["route"] = ["Provide segments, or provide both source and destination."]
         });
     }
+    if (request.Via.Any(string.IsNullOrWhiteSpace))
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["via"] = ["Via locations must not be empty."]
+        });
 
     var startedAt = Stopwatch.GetTimestamp();
     var result = await modelService.EstimateAsync(request, cancellationToken);
-    logger.LogInformation("Estimated route from {Source} to {Destination} with {WaypointCount} waypoints in {ElapsedMilliseconds} ms.",
-        request.Source, request.Destination, request.Waypoints.Count, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+    logger.LogInformation("Estimated route with {SegmentCount} segments in {ElapsedMilliseconds} ms.",
+        request.Segments.Count, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
     return Results.Ok(result);
 })
 .WithName("EstimateRoute")
 .WithSummary("Estimates route travel time.")
-.WithDescription("Collects route context, transforms it into model features, runs inference, and returns benchmark comparison.")
+.WithDescription("Estimates travel time for supplied route segments or a route obtained from a configured provider.")
 .Produces<RouteResponse>(StatusCodes.Status200OK)
 .ProducesValidationProblem()
 .ProducesProblem(StatusCodes.Status400BadRequest)
