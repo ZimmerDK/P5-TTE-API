@@ -43,6 +43,7 @@ public sealed class RouteDataCollector(
         if (!primary.DurationSeconds.HasValue) missingData.Add("durationSeconds");
         if (!primary.SpeedLimitKmh.HasValue) missingData.Add("speedLimitKmh");
         if (string.IsNullOrWhiteSpace(primary.RoadType)) missingData.Add("roadType");
+        if (primary.Segments.Count == 0) missingData.Add("segments");
 
         return new UnifiedRoute
         {
@@ -56,6 +57,8 @@ public sealed class RouteDataCollector(
             SpeedLimitKmh = primary.SpeedLimitKmh,
             TrafficSignalCount = primary.TrafficSignalCount,
             RouteDurationSeconds = primary.DurationSeconds,
+            Geometry = primary.Geometry,
+            Segments = primary.Segments,
             MissingData = missingData,
             ProviderData = providerData
         };
@@ -73,7 +76,8 @@ public sealed class RouteDataCollector(
             TrafficSignalCount = data.TrafficSignalCount,
             IsAvailable = data.IsAvailable,
             MissingFields = data.MissingFields,
-            Raw = data.Raw
+            Geometry = data.Geometry,
+            Segments = data.Segments
         };
     }
 
@@ -88,8 +92,7 @@ public sealed class RouteDataCollector(
         {
             Provider = provider.Name,
             IsAvailable = false,
-            MissingFields = ["provider"],
-            Raw = new Dictionary<string, object> { ["error"] = errorCode }
+            MissingFields = ["provider"]
         });
     }
 }

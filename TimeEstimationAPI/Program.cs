@@ -1,4 +1,4 @@
-﻿using TimeEstimationAPI.Models;
+using TimeEstimationAPI.Models;
 using TimeEstimationAPI.Services;
 using TimeEstimationAPI.Middleware;
 using System.Diagnostics;
@@ -11,10 +11,9 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.Configure<RouteModelOptions>(builder.Configuration.GetSection("Model"));
 builder.Services.Configure<OsmOptions>(builder.Configuration.GetSection("Osm"));
 builder.Services.Configure<ValhallaOptions>(builder.Configuration.GetSection("Valhalla"));
-builder.Services.Configure<MapCacheOptions>(builder.Configuration.GetSection("MapCache"));
 
-// This client is used for both Nominatim geocoding and the OSRM route call.
-// The public services are fine for occasional manual tests, not heavy polling.
+// This client is used for both Nominatim/OSM geocoding and the OSRM route call.
+// The public services are fine for occasional manual tests, not heavy polling for actual "real" use.
 builder.Services.AddHttpClient<OsrmService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
@@ -25,17 +24,6 @@ builder.Services.AddHttpClient<ValhallaService>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
 });
-builder.Services.Configure<GoogleRoutesOptions>(builder.Configuration.GetSection("GoogleRoutes"));
-
-// Google is optional and only called when an API key is configured.
-builder.Services.AddHttpClient<GoogleRoutesService>(client =>
-{
-    client.Timeout = TimeSpan.FromSeconds(15);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
-});
-builder.Services.AddSingleton<IGoogleRoutesService>(serviceProvider =>
-    serviceProvider.GetRequiredService<GoogleRoutesService>());
-
 // Keep the rest of the app independent from the actual route-data source.
 // Development uses stable local data; setting Osm:UseOsrm switches to live calls.
 builder.Services.AddSingleton<IEnumerable<IRouteProvider>>(serviceProvider =>
@@ -55,10 +43,7 @@ builder.Services.AddSingleton<IEnumerable<IRouteProvider>>(serviceProvider =>
 builder.Services.AddSingleton<RouteDataCollector>();
 builder.Services.AddSingleton<FeatureTransformer>();
 builder.Services.AddSingleton<TravelTimeModelRunner>();
-builder.Services.AddSingleton<BenchmarkEvaluator>();
-builder.Services.AddSingleton<IModelService, ModelService>();
-builder.Services.AddSingleton<IMapRegionCache, MapRegionCache>();
-builder.Services.AddHostedService<MapRegionUpdateService>();
+builder.Services.AddSingleton<ModelService>();
 
 var app = builder.Build();
 
@@ -72,7 +57,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Main route estimate endpoint: collect data, run the model, return the estimate and route used.
-app.MapPost("/api/routes/estimate", async (RouteRequest request, IModelService modelService, ILogger<Program> logger, CancellationToken cancellationToken) =>
+app.MapPost("/api/routes/estimate", async (RouteRequest request, ModelService modelService, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     if (string.IsNullOrWhiteSpace(request.Source) || string.IsNullOrWhiteSpace(request.Destination))
     {

@@ -37,6 +37,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal(2, document.RootElement.GetProperty("features").GetProperty("waypointsCount").GetInt32());
+        Assert.Equal(3, document.RootElement.GetProperty("route").GetProperty("segments").GetArrayLength());
     }
 
     [Fact]
@@ -59,6 +60,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal("Stockholm", root.GetProperty("route").GetProperty("source").GetString());
         Assert.Equal("development-stub", root.GetProperty("route")
             .GetProperty("providerData")[0].GetProperty("provider").GetString());
+        Assert.True(root.GetProperty("route").GetProperty("segments").GetArrayLength() > 0);
         Assert.Contains("durationSeconds", root.GetProperty("features")
             .GetProperty("missingDataFields").EnumerateArray().Select(value => value.GetString()));
     }

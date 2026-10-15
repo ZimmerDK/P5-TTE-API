@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using TimeEstimationAPI.Models;
 
 namespace TimeEstimationAPI.Services;
 
@@ -52,18 +53,63 @@ public sealed class ValhallaService(
             cancellationToken: cancellationToken);
 
         var summary = document.RootElement.GetProperty("trip").GetProperty("summary");
+        var trip = document.RootElement.GetProperty("trip");
+        var segments = ParseManeuvers(trip);
         return new OsmRouteMetadata
         {
             Provider = Name,
             DistanceMeters = summary.GetProperty("length").GetDouble() * 1000,
             DurationSeconds = summary.GetProperty("time").GetDouble(),
-            RoadType = null,
-            SpeedLimitKmh = null,
-            TrafficSignalCount = null,
-            MissingFields = ["roadType", "speedLimitKmh", "trafficSignalCount"],
-            Raw = new Dictionary<string, object> { ["provider"] = Name }
+            TrafficSignalCount = CountSignals(segments),
+            MissingFields = ["roadType", "speedLimitKmh", "laneCount"],
+            Segments = segments
         };
     }
+
+    private static List<RouteSegment> ParseManeuvers(JsonElement trip)
+    {
+        if (!trip.TryGetProperty("legs", out var legs))
+            return [];
+
+        var segments = new List<RouteSegment>();
+        var sequence = 0;
+        foreach (var leg in legs.EnumerateArray())
+        {
+            if (!leg.TryGetProperty("maneuvers", out var maneuvers))
+                continue;
+
+            foreach (var maneuver in maneuvers.EnumerateArray())
+            {
+                var type = maneuver.TryGetProperty("type", out var typeValue)
+                    ? typeValue.GetString()
+                    : null;
+                var isRoundabout = type?.Contains("roundabout", StringComparison.OrdinalIgnoreCase) == true;
+                segments.Add(new RouteSegment
+                {
+                    Sequence = sequence++,
+                    LengthMeters = GetDouble(maneuver, "length") * 1000,
+                    DurationSeconds = GetDouble(maneuver, "time"),
+                    RoadType = GetString(maneuver, "travel_type"),
+                    IsRoundabout = isRoundabout,
+                    IsIntersection = true,
+                    MissingData = ["speedLimitKmh", "laneCount", "hasTrafficSignal"]
+                });
+            }
+        }
+
+        return segments;
+    }
+
+    private static double GetDouble(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetDouble()
+            : 0;
+
+    private static string? GetString(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) ? value.GetString() : null;
+
+    private static int CountSignals(IEnumerable<RouteSegment> segments) =>
+        segments.Count(segment => segment.HasTrafficSignal == true);
 
     private async Task<(double Longitude, double Latitude)> GeocodeAsync(
         string query,

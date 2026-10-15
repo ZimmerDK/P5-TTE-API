@@ -11,7 +11,6 @@ public sealed class RouteModelOptions
     public bool UsePlaceholder { get; set; }
     public string ModelPath { get; set; } = "best_model.onnx";
     public double PlaceholderAverageSpeedKmh { get; set; } = 40;
-    public double PlaceholderWaypointDelaySeconds { get; set; } = 30;
 }
 
 /// <summary>Loads the ONNX model and turns route features into a time estimate.</summary>
@@ -60,10 +59,10 @@ public sealed class TravelTimeModelRunner
         _sequenceFeatureCount = checked((int)sequenceMetadata.Dimensions[2]);
     }
 
-    /// <summary>Runs ONNX inference, or the simple fallback while no model is loaded.</summary>
+    /// <summary>Runs ONNX inference, or simple fallback while no model is loaded.</summary>
     public double Predict(RouteFeatureVector featureVector)
     {
-        if (featureVector.Features.Length == 0)
+        if (featureVector.Sequence.Length == 0)
         {
             throw new ArgumentException("Feature vector cannot be empty.");
         }
@@ -79,14 +78,12 @@ public sealed class TravelTimeModelRunner
         }
 
         var featureTensor = new DenseTensor<float>(new[] { 1, _sequenceLength, _sequenceFeatureCount });
-        for (var i = 0; i < featureVector.Features.Length; i++)
+        for (var row = 0; row < featureVector.Sequence.Length && row < _sequenceLength; row++)
         {
-            if (i >= _sequenceFeatureCount)
-            {
-                break;
-            }
-
-            featureTensor[0, 0, i] = (float)featureVector.Features[i];
+            for (var column = 0;
+                 column < featureVector.Sequence[row].Length && column < _sequenceFeatureCount;
+                 column++)
+                featureTensor[0, row, column] = (float)featureVector.Sequence[row][column];
         }
 
         var timeTensor = new DenseTensor<float>(new[] { 1, TimeFeatureCount });
@@ -112,20 +109,17 @@ public sealed class TravelTimeModelRunner
         RouteModelOptions options)
     {
         // This is a transparent baseline, not a trained prediction.
-        var distanceKm = Math.Max(featureVector.Features[0], 0);
-        var historicalSpeedKmh = featureVector.Features.ElementAtOrDefault(6) * 100;
-        var speedKmh = historicalSpeedKmh > 0
-            ? historicalSpeedKmh
-            : Math.Max(options.PlaceholderAverageSpeedKmh, 1);
-        // Congestion here is a traffic slowdown assumption:
-        // 0 means no extra slowdown, 1 adds up to 35% to travel time.
-        var congestionMultiplier = 1 + Math.Clamp(featureVector.Features.ElementAtOrDefault(5), 0, 1) * 0.35;
+        var totalSeconds = 0d;
+        foreach (var segment in featureVector.Sequence)
+        {
+            var distanceKm = Math.Max(segment.ElementAtOrDefault(0), 0);
+            var speedKmh = segment.ElementAtOrDefault(1) * 130;
+            speedKmh = speedKmh > 0 ? speedKmh : Math.Max(options.PlaceholderAverageSpeedKmh, 1);
+            var signalDelaySeconds = segment.ElementAtOrDefault(5) * 10;
+            var roundaboutDelaySeconds = segment.ElementAtOrDefault(4) * 5;
+            totalSeconds += distanceKm / speedKmh * 3600 + signalDelaySeconds + roundaboutDelaySeconds;
+        }
 
-        // Signal delay is only applied when the provider supplied a signal count.
-        // A waypoint is a routing instruction, not automatically a stop.
-        var signalDelaySeconds = Math.Max(featureVector.Features.ElementAtOrDefault(3), 0) * 10;
-
-        return distanceKm / speedKmh * 3600 * congestionMultiplier
-            + signalDelaySeconds;
+        return totalSeconds;
     }
 }

@@ -1,5 +1,23 @@
 namespace TimeEstimationAPI.Models;
 
+public sealed record RoutePoint(double Longitude, double Latitude);
+
+public sealed record RouteSegment
+{
+    public int Sequence { get; init; }
+    public IReadOnlyList<RoutePoint> Geometry { get; init; } = [];
+    public IReadOnlyList<long> NodeIds { get; init; } = [];
+    public double? LengthMeters { get; init; }
+    public double? DurationSeconds { get; init; }
+    public string? RoadType { get; init; }
+    public double? SpeedLimitKmh { get; init; }
+    public int? LaneCount { get; init; }
+    public bool? IsRoundabout { get; init; }
+    public bool? HasTrafficSignal { get; init; }
+    public bool? IsIntersection { get; init; }
+    public IReadOnlyCollection<string> MissingData { get; init; } = [];
+}
+
 /// <summary>One provider's observations about a route.</summary>
 public sealed record RouteProviderData
 {
@@ -11,8 +29,8 @@ public sealed record RouteProviderData
     public int? TrafficSignalCount { get; init; }
     public bool IsAvailable { get; init; }
     public IReadOnlyCollection<string> MissingFields { get; init; } = [];
-    public IReadOnlyDictionary<string, object> Raw { get; init; } =
-        new Dictionary<string, object>();
+    public IReadOnlyList<RoutePoint> Geometry { get; init; } = [];
+    public IReadOnlyList<RouteSegment> Segments { get; init; } = [];
 }
 
 /// <summary>
@@ -25,6 +43,8 @@ public sealed record UnifiedRoute
     public required string Source { get; init; }
     public required string Destination { get; init; }
     public IReadOnlyList<string> Waypoints { get; init; } = [];
+    public IReadOnlyList<RoutePoint> Geometry { get; init; } = [];
+    public IReadOnlyList<RouteSegment> Segments { get; init; } = [];
     public DateTimeOffset DepartureTime { get; init; }
     public required string Mode { get; init; }
     public double? DistanceMeters { get; init; }

@@ -2,57 +2,67 @@ using TimeEstimationAPI.Models;
 
 namespace TimeEstimationAPI.Services;
 
-/// <summary>Maps the unified route into the feature layout expected by the model.</summary>
+/// <summary>Maps each ordered route segment to one model sequence row.</summary>
 public sealed class FeatureTransformer
 {
-    /// <summary>Builds numeric route and time features from the collected route.</summary>
     public RouteFeatureVector Transform(UnifiedRoute route)
     {
-        // The model cannot use a clock value directly. Sine/cosine keeps
-        // 23:00 close to 00:00 instead of treating them as far apart.
         var localTime = route.DepartureTime.ToLocalTime();
-
         var hour = localTime.Hour + localTime.Minute / 60.0;
         var minute = localTime.Minute + localTime.Second / 60.0;
 
         var timeFeatures = new[]
         {
-            Math.Sin((2 * Math.PI * hour) / 24.0),
-            Math.Cos((2 * Math.PI * hour) / 24.0),
-            Math.Sin((2 * Math.PI * minute) / 60.0),
-            Math.Cos((2 * Math.PI * minute) / 60.0)
+            Math.Sin(2 * Math.PI * hour / 24.0),
+            Math.Cos(2 * Math.PI * hour / 24.0),
+            Math.Sin(2 * Math.PI * minute / 60.0),
+            Math.Cos(2 * Math.PI * minute / 60.0)
         };
 
-        // These numbers are category codes, not real road measurements.
-        // The final model training code must use the same mapping.
-        var roadTypeCode = route.RoadType switch
-        {
-            "motorway" => 3.0,
-            "secondary" => 2.0,
-            _ => 1.0
-        };
+        var segments = route.Segments.Count > 0
+            ? route.Segments
+            : [new RouteSegment
+            {
+                Sequence = 0,
+                LengthMeters = route.DistanceMeters,
+                RoadType = route.RoadType,
+                SpeedLimitKmh = route.SpeedLimitKmh,
+                IsIntersection = route.TrafficSignalCount > 0,
+                MissingData = ["segments"]
+            }];
 
-        // Keep this order stable. It is the contract between this API and the model.
-        // Values are scaled where noted so one large number does not dominate.
-        var featureVector = new[]
-        {
-            (route.DistanceMeters ?? 0) / 1000.0, // distance, metres -> kilometres
-            (route.SpeedLimitKmh ?? 0) / 120.0, // speed, scaled against 120 km/h
-            roadTypeCode,
-            (route.TrafficSignalCount ?? 0) / 10.0, // signal count, scaled
-            1.0, // urban flag placeholder: 1 means "urban" for now
-            0.5, // congestion placeholder: 0 = none, 1 = heavy
-            ((route.SpeedLimitKmh ?? 0) * 0.75) / 100.0, // rough historical speed
-            1.0, // weather factor placeholder: 1 means neutral weather
-            route.MissingData.Count > 0 ? 1.0 : 0.0, // any source data missing
-            route.Waypoints.Count // kept as a count for the current model
-        };
+        var sequence = segments
+            .OrderBy(segment => segment.Sequence)
+            .Select(segment => new[]
+            {
+                Math.Max(segment.LengthMeters ?? 0, 0) / 1000.0,
+                Math.Clamp(segment.SpeedLimitKmh ?? 0, 0, 130) / 130.0,
+                RoadTypeCode(segment.RoadType),
+                Math.Clamp(segment.LaneCount ?? 0, 0, 8) / 8.0,
+                segment.IsRoundabout == true ? 1.0 : 0.0,
+                segment.HasTrafficSignal == true ? 1.0 : 0.0,
+                segment.IsIntersection == true ? 1.0 : 0.0,
+                1.0, // urban/weather data is not supplied by the providers yet
+                segment.MissingData.Count > 0 || route.MissingData.Count > 0 ? 1.0 : 0.0,
+                Math.Max(segment.DurationSeconds ?? 0, 0) / 3600.0
+            })
+            .ToArray();
 
         return new RouteFeatureVector
         {
-            Features = featureVector,
+            Sequence = sequence,
             TimeFeatures = timeFeatures,
             ModelName = "route_time_model_v1"
         };
     }
+
+    private static double RoadTypeCode(string? roadType) =>
+        roadType?.ToLowerInvariant() switch
+        {
+            "motorway" => 3,
+            "trunk" => 2.5,
+            "primary" => 2,
+            "secondary" => 1.5,
+            _ => 1
+        };
 }
