@@ -52,55 +52,38 @@ public sealed class FeatureTransformer
                 Math.Max(segment.DurationSeconds ?? 0, 0) / 3600.0
             })
             .ToArray();
+        var localDeparture = route.DepartureTime.ToLocalTime();
         var segmentFeatures = orderedSegments
-            .Select((segment, index) => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+            .Select(segment => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
             {
-                ["lengthKm"] = sequence[index][0],
-                ["speedLimitNormalized"] = sequence[index][1],
-                ["roadTypeCode"] = sequence[index][2],
-                ["laneCountNormalized"] = sequence[index][3],
-                ["isRoundabout"] = sequence[index][4],
-                ["hasTrafficSignal"] = sequence[index][5],
-                ["isIntersection"] = sequence[index][6],
-                ["environmentPlaceholder"] = sequence[index][7],
-                ["missingData"] = sequence[index][8],
-                ["providerDurationHours"] = sequence[index][9]
+                ["matched_length_m"] = Math.Max(segment.LengthMeters ?? 0, 0),
+                ["hour"] = localDeparture.Hour,
+                ["minute"] = localDeparture.Minute,
+                ["day_of_week"] = (int)localDeparture.DayOfWeek,
+                ["month"] = localDeparture.Month,
+                ["speed_limit_kmh"] = Math.Max(segment.SpeedLimitKmh ?? 0, 0),
+                ["density"] = 0,
+                ["lane_count"] = Math.Max(segment.LaneCount ?? 0, 0),
+                ["bridge"] = 0,
+                ["tunnel"] = 0,
+                ["roundabout"] = segment.IsRoundabout == true ? 1 : 0,
+                ["internal_intersection"] = segment.IsIntersection == true ? 1 : 0
             })
             .ToArray();
-        var localDeparture = route.DepartureTime.ToLocalTime();
-        var routeSpeedLimit = orderedSegments
-            .Select(segment => segment.SpeedLimitKmh)
-            .Where(value => value.HasValue)
-            .Select(value => value!.Value)
-            .DefaultIfEmpty(0)
-            .Average();
-        var routeFeatures = new Dictionary<string, object?>
-        {
-            ["matched_length_m"] = Math.Max(route.DistanceMeters ?? orderedSegments.Sum(segment => segment.LengthMeters ?? 0), 0),
-            ["hour"] = localDeparture.Hour,
-            ["minute"] = localDeparture.Minute,
-            ["day_of_week"] = (int)localDeparture.DayOfWeek,
-            ["month"] = localDeparture.Month,
-            ["speed_limit_kmh"] = routeSpeedLimit,
-            ["density"] = 0,
-            ["lane_count"] = orderedSegments
-                .Select(segment => segment.LaneCount)
-                .Where(value => value.HasValue)
-                .Select(value => value!.Value)
-                .DefaultIfEmpty(0)
-                .Average(),
-            ["bridge"] = 0,
-            ["tunnel"] = 0,
-            ["roundabout"] = orderedSegments.Any(segment => segment.IsRoundabout == true) ? 1 : 0,
-            ["internal_intersection"] = orderedSegments.Any(segment => segment.IsIntersection == true) ? 1 : 0
-        };
 
         return new RouteFeatureVector
         {
             Sequence = sequence,
             TimeFeatures = timeFeatures,
             SegmentFeatures = segmentFeatures,
-            RouteFeatures = routeFeatures,
+            RouteFeatures = new Dictionary<string, object?>
+            {
+                ["matched_length_m"] = Math.Max(route.DistanceMeters ?? orderedSegments.Sum(segment => segment.LengthMeters ?? 0), 0),
+                ["hour"] = localDeparture.Hour,
+                ["minute"] = localDeparture.Minute,
+                ["day_of_week"] = (int)localDeparture.DayOfWeek,
+                ["month"] = localDeparture.Month
+            },
             ModelName = "route_time_model_v1"
         };
     }

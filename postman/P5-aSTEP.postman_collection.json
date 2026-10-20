@@ -1,0 +1,249 @@
+{
+  "info": {
+    "_postman_id": "p5-astep-local",
+    "name": "P5 aSTEP",
+    "description": "Local requests for the P5 aSTEP route estimation API and Python joblib model service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "apiBaseUrl",
+      "value": "http://localhost:5073"
+    },
+    {
+      "key": "pythonBaseUrl",
+      "value": "http://127.0.0.1:8001"
+    }
+  ],
+  "item": [
+    {
+      "name": "Python Model Service",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{pythonBaseUrl}}/health",
+              "host": [
+                "{{pythonBaseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Reports healthy status\", function () {",
+                  "    pm.expect(pm.response.json().status).to.eql(\"ok\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Model Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{pythonBaseUrl}}/model-info",
+              "host": [
+                "{{pythonBaseUrl}}"
+              ],
+              "path": [
+                "model-info"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Reports a loaded model\", function () {",
+                  "    pm.expect(body.modelType).to.be.a(\"string\");",
+                  "    pm.expect(body.modelFeatures).to.be.an(\"array\");",
+                  "    pm.expect(body.modelFeatures.length).to.eql(12);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Predict Route Time",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"modelName\": \"route_time_model_v1\",\n  \"segmentFeatures\": [\n    {\n      \"matched_length_m\": 1000,\n      \"hour\": 8,\n      \"minute\": 30,\n      \"day_of_week\": 2,\n      \"month\": 10,\n      \"speed_limit_kmh\": 50,\n      \"density\": 0,\n      \"lane_count\": 2,\n      \"bridge\": 0,\n      \"tunnel\": 0,\n      \"roundabout\": 0,\n      \"internal_intersection\": 1\n    }\n  ],\n  \"routeFeatures\": {},\n  \"timeFeatures\": {}\n}"
+            },
+            "url": {
+              "raw": "{{pythonBaseUrl}}/predict",
+              "host": [
+                "{{pythonBaseUrl}}"
+              ],
+              "path": [
+                "predict"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Returns a positive prediction in seconds\", function () {",
+                  "    pm.expect(body.estimated_travel_time_seconds).to.be.a(\"number\");",
+                  "    pm.expect(body.estimated_travel_time_seconds).to.be.above(0);",
+                  "});",
+                  "",
+                  "pm.test(\"Returns segment predictions\", function () {",
+                  "    pm.expect(body.segment_predictions).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ASP.NET API",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiBaseUrl}}/health",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Reports healthy status\", function () {",
+                  "    pm.expect(pm.response.json().status).to.eql(\"ok\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estimate Route with Explicit Segments",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"segments\": [\n    {\n      \"lengthMeters\": 1000,\n      \"speedLimitKmh\": 50,\n      \"laneCount\": 2,\n      \"isRoundabout\": false,\n      \"hasTrafficSignal\": false,\n      \"isIntersection\": true,\n      \"nodeIds\": [1001, 1002]\n    }\n  ],\n  \"departureTime\": \"2026-10-20T08:30:00+02:00\",\n  \"mode\": \"car\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/api/routes/estimate",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "routes",
+                "estimate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Returns a positive estimate in seconds\", function () {",
+                  "    pm.expect(body.estimatedTravelTimeSeconds).to.be.a(\"number\");",
+                  "    pm.expect(body.estimatedTravelTimeSeconds).to.be.above(0);",
+                  "});",
+                  "",
+                  "pm.test(\"Returns the route and segments\", function () {",
+                  "    pm.expect(body.route).to.be.an(\"object\");",
+                  "    pm.expect(body.route.segments).to.be.an(\"array\");",
+                  "});",
+                  "",
+                  "pm.test(\"Returns model diagnostics\", function () {",
+                  "    pm.expect(body.features).to.be.an(\"object\");",
+                  "    pm.expect(body.features.segmentCount).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

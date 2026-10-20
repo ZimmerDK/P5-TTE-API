@@ -77,7 +77,7 @@ def model_info() -> dict[str, Any]:
     return {
         "modelPath": _model_path(),
         "modelType": type(model).__name__,
-        "inputMode": os.environ.get("MODEL_INPUT_MODE", "route"),
+        "inputMode": os.environ.get("MODEL_INPUT_MODE", "segments"),
         "configuredFeatures": _configured_feature_names(),
         "modelFeatures": feature_names.tolist() if feature_names is not None else None,
     }
@@ -109,12 +109,12 @@ def predict(request: PredictionRequest) -> PredictionResponse:
 
 
 def _predict(model: Any, request: PredictionRequest) -> Any:
-    input_mode = os.environ.get("MODEL_INPUT_MODE", "route").lower()
+    input_mode = os.environ.get("MODEL_INPUT_MODE", "segments").lower()
     feature_names = _configured_feature_names()
 
     if input_mode == "segments":
         rows = [
-            _select_features({**request.route_features, **request.time_features, **segment}, feature_names)
+            _select_features(segment, feature_names)
             for segment in request.segment_features
         ]
         model_input = pd.DataFrame(rows)

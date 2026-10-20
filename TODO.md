@@ -25,6 +25,13 @@ before changing routing, feature engineering, or model integration.
 
 ## Align model features
 
+- [ ] Verify the segment-level prediction flow with the ML team's expected
+      multi-segment request and confirm that route time is the sum of segment
+      predictions.
+- [ ] Confirm that `matched_length_m` is the map-matched length of each
+      individual segment, not the full route length.
+- [ ] Confirm the current zero defaults for `density`, `bridge`, and `tunnel`
+      against the training pipeline.
 - [ ] Replace the provisional feature order, units, clamps, normalization
       divisors, road-type codes, and placeholder environment value in
       `FeatureTransformer` with the ML team's training contract.

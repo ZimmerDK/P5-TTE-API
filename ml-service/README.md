@@ -42,8 +42,8 @@ Then set `MODEL_NAME` in `.env`, for example:
 ```text
 MODEL_DIR=models
 MODEL_NAME=RandomForestRegressor
-MODEL_INPUT_MODE=route
-MODEL_FEATURES=matched_length_m,hour,minute,day_of_week,month,day_of_month,weekend,speed_limit_kmh,density,lane_count,bridge,tunnel,toll,roundabout,internal_intersection
+MODEL_INPUT_MODE=segments
+MODEL_FEATURES=matched_length_m,hour,minute,day_of_week,month,speed_limit_kmh,density,lane_count,bridge,tunnel,roundabout,internal_intersection
 ```
 
 Use `MODEL_PATH` instead when the file has a different name or is stored
@@ -67,9 +67,9 @@ above. The service verifies that configured features exist before prediction.
 The model metadata can be inspected at `/model-info`; the `modelFeatures` field
 is read from `feature_names_in_`.
 
-`MODEL_INPUT_MODE=route` calls `model.predict` once with one route-level row.
-The current artifacts expose route-level feature names and are configured for
-this mode.
+`MODEL_INPUT_MODE=segments` calls `model.predict` with one row per route
+segment. The returned predictions are one value per segment; the API sums them
+for the total route estimate.
 
 The API currently has no provider data for `density`, `bridge`, or `tunnel`;
 those values are sent as `0` until the route providers supply them.

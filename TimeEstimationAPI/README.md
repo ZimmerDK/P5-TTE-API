@@ -258,10 +258,11 @@ The current transformer maps available route data to these names. `density`,
 route providers do not expose them; confirm that convention with the ML team
 before using production estimates.
 
-The Python service is configured for route-level input because all five
-artifacts expose one row of 15 route-level numeric features. The model output
-unit still needs to be confirmed with the ML team before treating it as
-seconds.
+The Python service is configured for segment-level input. Each ordered route
+segment becomes one row containing the model's 12 features. The Python service
+predicts every row and sums those predictions into the route estimate.
+`route.segments[*].predictedDurationSeconds` contains the individual segment
+predictions.
 
 The ASP.NET adapter sends named `routeFeatures`, `segmentFeatures`, and
 `timeFeatures` objects to the Python service. The exact feature names, order,
