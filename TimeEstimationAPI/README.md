@@ -12,7 +12,7 @@ build the segments. The API then:
 1. asks the enabled route provider(s) for a route and its ordered segments;
 2. chooses the available primary result and records all provider results;
 3. turns each segment into one row in the numeric model sequence;
-4. runs the configured ONNX model, or a simple placeholder calculation;
+4. calls the configured Python model service, or runs a simple placeholder calculation;
 5. returns the estimate together with the route data used.
 
 `GET /health` is a basic liveness check.
@@ -77,6 +77,81 @@ Run tests from the repository root:
 dotnet test .\TimeEstimationAPI.Tests\TimeEstimationAPI.Tests.csproj
 ```
 
+### Running the API and Python model service together
+
+The repository includes a launcher for local use. First create the Python
+environment and install its dependencies:
+
+```powershell
+cd C:\Dev\P5-TTE-API
+python -m venv .\ml-service\.venv
+.\ml-service\.venv\Scripts\python.exe -m pip install -r .\ml-service\requirements.txt
+```
+
+Place the trusted model at
+`C:\Dev\P5-TTE-API\ml-service\models\model.joblib`, then start both services:
+
+```powershell
+.\Start-LocalServices.ps1
+```
+
+The launcher starts:
+
+- the Python model service at `http://127.0.0.1:8001`;
+- the ASP.NET API at `http://localhost:5073`.
+
+Check both services:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8001/health
+Invoke-RestMethod http://localhost:5073/health
+```
+
+To use a model at another path:
+
+```powershell
+.\Start-LocalServices.ps1 -ModelPath "D:\models\route-model.joblib"
+```
+
+The launcher prints both process IDs. Stop those exact processes when finished:
+
+```powershell
+Stop-Process -Id <pythonPid>,<apiPid>
+```
+
+#### Two-terminal workflow
+
+After the one-time setup above, use these commands.
+
+Terminal 1 - Python model service:
+
+```powershell
+cd C:\Dev\P5-TTE-API\ml-service
+Copy-Item .env.example .env
+# Edit .env and choose MODEL_NAME after placing the .joblib files in .\models
+.\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8001
+```
+
+Terminal 2 - ASP.NET API:
+
+```powershell
+cd C:\Dev\P5-TTE-API
+$env:Model__UsePlaceholder = "false"
+$env:Model__UsePythonService = "true"
+$env:Model__PythonServiceUrl = "http://127.0.0.1:8001"
+dotnet run --project .\TimeEstimationAPI\TimeEstimationAPI.csproj --launch-profile http
+```
+
+Keep both terminals open. The Python service must be running before sending
+route-estimation requests to the ASP.NET API.
+
+If PowerShell blocks local scripts, allow scripts for the current process only:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\Start-LocalServices.ps1
+```
+
 ## Providers
 
 ### Development provider
@@ -134,6 +209,9 @@ Development uses the placeholder by default:
 ```json
 "Model": {
   "UsePlaceholder": true,
+  "UsePythonService": false,
+  "PythonServiceUrl": "http://localhost:8001",
+  "PythonServiceTimeoutSeconds": 30,
   "PlaceholderAverageSpeedKmh": 40
 }
 ```
@@ -142,28 +220,52 @@ The placeholder is a transparent baseline: distance divided by an assumed
 speed, plus a small signal-delay assumption when signal data exists. It is not
 traffic data and it is not a trained model.
 
-To try an ONNX model:
-```powershell
-$env:Model__UsePlaceholder = "false"
-dotnet run --no-launch-profile
+### MLM model integration
+
+The ML team supplies the trained model as a Python `.joblib` artifact. The
+ASP.NET API does not load `.joblib` directly. Instead, the companion Python
+service in [`ml-service`](../ml-service) loads the artifact and exposes
+prediction over HTTP.
+
+```text
+C:\Dev\P5-TTE-API\ml-service\models\model.joblib
 ```
 
-An ONNX model can be supplied later by setting `ModelPath` and
-`UsePlaceholder` to `false`. The old `best_model.onnx` from another project is
-not included or used. Matching tensor shapes are not enough to prove that a
-model is scientifically compatible: feature order, scaling, training data,
-target units, and output meaning must also match.
+Start the Python service on port `8001`, then configure the ASP.NET API:
 
-The current feature mapping is in
-[`FeatureTransformer.cs`](./Services/FeatureTransformer.cs). Every segment
-becomes one row with length, speed, road-type code, lanes, roundabout,
-traffic-signal, intersection, and missing-data features. This is a
-provisional contract and must be aligned with the team's training pipeline
-before treating the output as a production estimate.
+```json
+"Model": {
+  "UsePlaceholder": false,
+  "UsePythonService": true,
+  "PythonServiceUrl": "http://localhost:8001",
+  "PythonServiceTimeoutSeconds": 30
+}
+```
 
-The ONNX adapter writes rows as `sequence[0, segmentIndex, featureIndex]`.
-The exact sequence length and feature ordering still need confirmation from
-the ML team.
+The model's `FEATURES` entries are the source of truth for
+[`FeatureTransformer.cs`](./Services/FeatureTransformer.cs). Each feature must
+be mapped by its exact name and training definition, including order, units,
+normalization, categorical encoding, missing-value handling, and whether it is
+a segment-level or route-level value. The current supplied joblib artifacts expose this route-level feature order:
+
+```text
+matched_length_m, hour, minute, day_of_week, month, speed_limit_kmh, density,
+lane_count, bridge, tunnel, roundabout, internal_intersection
+```
+
+The current transformer maps available route data to these names. `density`,
+`bridge`, and `tunnel` are currently sent as zero because the active
+route providers do not expose them; confirm that convention with the ML team
+before using production estimates.
+
+The Python service is configured for route-level input because all five
+artifacts expose one row of 15 route-level numeric features. The model output
+unit still needs to be confirmed with the ML team before treating it as
+seconds.
+
+The ASP.NET adapter sends named `routeFeatures`, `segmentFeatures`, and
+`timeFeatures` objects to the Python service. The exact feature names, order,
+types, and input mode still need confirmation from the ML team.
 
 ## Main files
 - `Program.cs` — dependency injection and the two HTTP endpoints.
@@ -173,7 +275,9 @@ the ML team.
 - `Services/RouteProvider.cs` — provider contract, OSRM adapter, and development provider.
 - `Services/ValhallaService.cs` — Valhalla adapter.
 - `Services/FeatureTransformer.cs` — maps route data to model numbers.
-- `Services/ModelRunner.cs` — ONNX loading or placeholder prediction.
+- `Services/ModelRunner.cs` — placeholder prediction and model-runner contract.
+- `Services/PythonModelRunner.cs` — HTTP client for the Python `.joblib` service.
+- `../ml-service/app.py` — Python model loading and prediction service.
 - `Services/ModelService.cs` — coordinates the estimate pipeline.
 - `Middleware/ApiExceptionHandler.cs` — consistent error responses.
 

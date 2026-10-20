@@ -7,12 +7,12 @@ public sealed class ModelService
 {
     private readonly RouteDataCollector _collector;
     private readonly FeatureTransformer _featureTransformer;
-    private readonly TravelTimeModelRunner _modelRunner;
+    private readonly ITravelTimeModelRunner _modelRunner;
 
     public ModelService(
         RouteDataCollector collector,
         FeatureTransformer featureTransformer,
-        TravelTimeModelRunner modelRunner)
+        ITravelTimeModelRunner modelRunner)
     {
         _collector = collector;
         _featureTransformer = featureTransformer;
@@ -35,19 +35,18 @@ public sealed class ModelService
             : await _collector.CollectAsync(request, cancellationToken);
 
         var vector = _featureTransformer.Transform(route);
-        var predictedSeconds = _modelRunner.Predict(vector);
-        var segmentPredictions = _modelRunner.PredictSegments(vector);
+        var prediction = await _modelRunner.PredictAsync(vector, cancellationToken);
         route = route with
         {
             Segments = route.Segments.Select((segment, index) => segment with
             {
-                PredictedDurationSeconds = segmentPredictions.ElementAtOrDefault(index)
+                PredictedDurationSeconds = prediction.SegmentPredictions.ElementAtOrDefault(index)
             }).ToArray()
         };
 
         return new RouteResponse
         {
-            EstimatedTravelTimeSeconds = predictedSeconds,
+            EstimatedTravelTimeSeconds = prediction.EstimatedTravelTimeSeconds,
             DistanceMeters = route.DistanceMeters ?? 0,
             ModelName = vector.ModelName,
             Route = route,

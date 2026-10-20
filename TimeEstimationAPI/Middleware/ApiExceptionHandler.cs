@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using TimeEstimationAPI.Services;
 
 namespace TimeEstimationAPI.Middleware;
 
@@ -15,6 +16,7 @@ internal sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) :
         var (statusCode, title, detail) = exception switch
         {
             ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request", exception.Message),
+            ModelServiceUnavailableException => (StatusCodes.Status502BadGateway, "Model service unavailable", "The Python model service could not be reached or returned an invalid response."),
             HttpRequestException => (StatusCodes.Status502BadGateway, "Route provider unavailable", "The route provider could not be reached."),
             _ => (StatusCodes.Status500InternalServerError, "Internal server error", "An unexpected error occurred.")
         };

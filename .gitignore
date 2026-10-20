@@ -2,3 +2,7 @@ bin/
 obj/
 .vs/
 *.user
+ml-service/.venv/
+ml-service/models/
+ml-service/.env
+*.joblib

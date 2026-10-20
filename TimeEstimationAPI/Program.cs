@@ -24,6 +24,7 @@ builder.Services.AddHttpClient<ValhallaService>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
 });
+builder.Services.AddHttpClient<PythonModelRunner>();
 // Keep the rest of the app independent from the actual route-data source.
 // Development uses stable local data; setting Osm:UseOsrm switches to live calls.
 builder.Services.AddSingleton<IEnumerable<IRouteProvider>>(serviceProvider =>
@@ -43,6 +44,18 @@ builder.Services.AddSingleton<IEnumerable<IRouteProvider>>(serviceProvider =>
 builder.Services.AddSingleton<RouteDataCollector>();
 builder.Services.AddSingleton<FeatureTransformer>();
 builder.Services.AddSingleton<TravelTimeModelRunner>();
+builder.Services.AddSingleton<ITravelTimeModelRunner>(serviceProvider =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<RouteModelOptions>>().Value;
+    if (options.UsePythonService && !options.UsePlaceholder)
+        return serviceProvider.GetRequiredService<PythonModelRunner>();
+    if (!options.UsePlaceholder)
+        throw new InvalidOperationException(
+            "No model backend is configured. Enable Model:UsePythonService or Model:UsePlaceholder.");
+
+    return serviceProvider.GetRequiredService<TravelTimeModelRunner>();
+});
 builder.Services.AddSingleton<ModelService>();
 
 var app = builder.Build();
