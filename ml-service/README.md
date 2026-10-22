@@ -6,6 +6,15 @@ prediction over HTTP. The ASP.NET API calls it when
 
 ## Setup
 
+From the repository root, perform the one-time setup:
+
+```powershell
+cd C:\Dev\P5-TTE-API
+python -m venv .\ml-service\.venv
+.\ml-service\.venv\Scripts\python.exe -m pip install -r .\ml-service\requirements.txt
+Copy-Item .\ml-service\.env.example .\ml-service\.env
+```
+
 Use the Python and dependency versions required to load the model. The
 constraints in `requirements.txt` currently allow Python 3.14-compatible
 wheels; align them with the training environment before using the production
@@ -20,7 +29,7 @@ python -m venv .venv
 Place the model outside source control, for example:
 
 ```text
-C:\Dev\P5-TTE-API\ml-service\models\model.joblib
+C:\Dev\P5-TTE-API\ml-service\models\XGBRegressor.joblib
 ```
 
 The repository supports the model files currently available:
@@ -84,11 +93,48 @@ http://127.0.0.1:8001/model-info
 The `.joblib` file is intentionally not included in this repository. Joblib
 uses Python pickle serialization, so only load trusted model files.
 
+The ASP.NET API setup and request examples are in
+[`TimeEstimationAPI/README.md`](../TimeEstimationAPI/README.md).
+
 ## Endpoints
 
 - `GET /health`
+- `GET /model-info`
 - `POST /predict`
 
 The ASP.NET API sends a request containing `routeFeatures`,
 `segmentFeatures`, and `timeFeatures`. This boundary can be adjusted once the
-ML feature contract is finalized.
+ML feature contract is finalized. A direct segment-mode request looks like:
+
+```json
+{
+  "modelName": "route_time_model_v1",
+  "routeFeatures": {},
+  "segmentFeatures": [
+    {
+      "matched_length_m": 1000,
+      "hour": 8,
+      "minute": 30,
+      "day_of_week": 4,
+      "month": 10,
+      "speed_limit_kmh": 50,
+      "density": 0,
+      "lane_count": 2,
+      "bridge": 0,
+      "tunnel": 0,
+      "roundabout": 0,
+      "internal_intersection": 1
+    }
+  ],
+  "timeFeatures": {}
+}
+```
+
+The response contains one prediction per input segment:
+
+```json
+{
+  "estimated_travel_time_seconds": 75.1,
+  "segment_predictions": [75.1]
+}
+```

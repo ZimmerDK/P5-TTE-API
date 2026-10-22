@@ -8,10 +8,42 @@ POST {{baseUrl}}/api/routes/estimate
 Content-Type: application/json
 
 {
-  "source": "A",
-  "destination": "B",
-  "via": ["C", "D"],
-  "departureTime": "2026-09-24T08:30:00Z",
+  "source": "Stockholm",
+  "destination": "Gothenburg",
+  "via": [],
+  "departureTime": "2026-10-22T08:30:00+02:00",
+  "mode": "car"
+}
+
+### Estimate an explicitly supplied segment route
+POST {{baseUrl}}/api/routes/estimate
+Content-Type: application/json
+
+{
+  "source": "Segment route start",
+  "destination": "Segment route end",
+  "via": [],
+  "segments": [
+    {
+      "lengthMeters": 1000,
+      "roadType": "primary",
+      "speedLimitKmh": 50,
+      "laneCount": 2,
+      "isRoundabout": false,
+      "hasTrafficSignal": true,
+      "isIntersection": true
+    },
+    {
+      "lengthMeters": 500,
+      "roadType": "secondary",
+      "speedLimitKmh": 30,
+      "laneCount": 1,
+      "isRoundabout": true,
+      "hasTrafficSignal": false,
+      "isIntersection": true
+    }
+  ],
+  "departureTime": "2026-10-22T08:30:00+02:00",
   "mode": "car"
 }
 

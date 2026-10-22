@@ -59,7 +59,7 @@ public sealed class ValhallaService(
         {
             Provider = Name,
             DistanceMeters = summary.GetProperty("length").GetDouble() * 1000,
-            DurationSeconds = summary.GetProperty("time").GetDouble(),
+            ProviderEstimatedDurationSeconds = summary.GetProperty("time").GetDouble(),
             TrafficSignalCount = CountSignals(segments),
             MissingFields = ["roadType", "speedLimitKmh", "laneCount"],
             Segments = segments
@@ -88,7 +88,7 @@ public sealed class ValhallaService(
                 {
                     Sequence = sequence++,
                     LengthMeters = GetDouble(maneuver, "length") * 1000,
-                    DurationSeconds = GetDouble(maneuver, "time"),
+                    ProviderEstimatedDurationSeconds = GetDouble(maneuver, "time"),
                     RoadType = GetString(maneuver, "travel_type"),
                     IsRoundabout = isRoundabout,
                     IsIntersection = true,

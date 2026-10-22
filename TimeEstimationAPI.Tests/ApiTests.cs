@@ -61,7 +61,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal("development-stub", root.GetProperty("route")
             .GetProperty("providerData")[0].GetProperty("provider").GetString());
         Assert.True(root.GetProperty("route").GetProperty("segments").GetArrayLength() > 0);
-        Assert.Contains("durationSeconds", root.GetProperty("features")
+        Assert.Contains("providerEstimatedDurationSeconds", root.GetProperty("features")
             .GetProperty("missingDataFields").EnumerateArray().Select(value => value.GetString()));
     }
 
@@ -94,8 +94,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
                     laneCount = 2,
                     isRoundabout = false,
                     hasTrafficSignal = true,
-                    isIntersection = true,
-                    nodeIds = new[] { 10L, 11L }
+                    isIntersection = true
                 },
                 new
                 {
@@ -104,8 +103,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
                     laneCount = 1,
                     isRoundabout = true,
                     hasTrafficSignal = false,
-                    isIntersection = true,
-                    nodeIds = new[] { 11L, 12L }
+                    isIntersection = true
                 }
             },
             departureTime = "2026-09-24T08:30:00Z",
@@ -118,6 +116,9 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(2, root.GetProperty("route").GetProperty("segments").GetArrayLength());
         Assert.All(root.GetProperty("route").GetProperty("segments").EnumerateArray(),
             segment => Assert.True(segment.GetProperty("predictedDurationSeconds").GetDouble() > 0));
-        Assert.True(root.GetProperty("estimatedTravelTimeSeconds").GetDouble() > 0);
+        var total = root.GetProperty("estimatedTravelTimeSeconds").GetDouble();
+        var segmentTotal = root.GetProperty("route").GetProperty("segments").EnumerateArray()
+            .Sum(segment => segment.GetProperty("predictedDurationSeconds").GetDouble());
+        Assert.Equal(segmentTotal, total, precision: 10);
     }
 }

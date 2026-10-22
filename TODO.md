@@ -25,9 +25,10 @@ before changing routing, feature engineering, or model integration.
 
 ## Align model features
 
-- [ ] Verify the segment-level prediction flow with the ML team's expected
-      multi-segment request and confirm that route time is the sum of segment
-      predictions.
+- [x] Implement segment-level prediction: one model row and one prediction per
+      ordered route segment, with route time equal to their sum.
+- [ ] Verify the implementation with the ML team's expected multi-segment
+      request and confirm the trained model's output semantics.
 - [ ] Confirm that `matched_length_m` is the map-matched length of each
       individual segment, not the full route length.
 - [ ] Confirm the current zero defaults for `density`, `bridge`, and `tunnel`
@@ -37,7 +38,8 @@ before changing routing, feature engineering, or model integration.
       `FeatureTransformer` with the ML team's training contract.
 - [ ] Confirm whether missing values use zero, imputation, masks, or one flag
       per feature.
-- [ ] Confirm whether provider duration belongs in the model input at all.
+- [x] Keep provider duration out of the model input; expose it only as a
+      comparison/diagnostic value.
 
 ## Define time semantics
 

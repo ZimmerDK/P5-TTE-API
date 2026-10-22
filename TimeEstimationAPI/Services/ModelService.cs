@@ -36,17 +36,29 @@ public sealed class ModelService
 
         var vector = _featureTransformer.Transform(route);
         var prediction = await _modelRunner.PredictAsync(vector, cancellationToken);
+        if (prediction.SegmentPredictions.Count != route.Segments.Count)
+        {
+            throw new ModelServiceUnavailableException(
+                $"The model returned {prediction.SegmentPredictions.Count} segment predictions for {route.Segments.Count} route segments.");
+        }
+
+        var segmentPredictions = prediction.SegmentPredictions
+            .Select(value => value ?? throw new ModelServiceUnavailableException(
+                "The model returned a missing segment prediction."))
+            .ToArray();
         route = route with
         {
             Segments = route.Segments.Select((segment, index) => segment with
             {
-                PredictedDurationSeconds = prediction.SegmentPredictions.ElementAtOrDefault(index)
+                PredictedDurationSeconds = segmentPredictions[index]
             }).ToArray()
         };
 
         return new RouteResponse
         {
-            EstimatedTravelTimeSeconds = prediction.EstimatedTravelTimeSeconds,
+            EstimatedTravelTimeSeconds = segmentPredictions.Sum(),
+            ProviderEstimatedTravelTimeSeconds = route.ProviderEstimatedTravelTimeSeconds,
+            ProviderName = route.SelectedProvider,
             DistanceMeters = route.DistanceMeters ?? 0,
             ModelName = vector.ModelName,
             Route = route,
@@ -70,14 +82,12 @@ public sealed class ModelService
         {
             Sequence = index,
             LengthMeters = segment.LengthMeters,
-            DurationSeconds = segment.DurationSeconds,
             RoadType = segment.RoadType,
             SpeedLimitKmh = segment.SpeedLimitKmh,
             LaneCount = segment.LaneCount,
             IsRoundabout = segment.IsRoundabout,
             HasTrafficSignal = segment.HasTrafficSignal,
             IsIntersection = segment.IsIntersection,
-            NodeIds = segment.NodeIds,
             MissingData = MissingFields(segment)
         }).ToArray();
 
@@ -89,9 +99,7 @@ public sealed class ModelService
             DepartureTime = request.DepartureTime,
             Mode = request.Mode,
             DistanceMeters = segments.Sum(segment => segment.LengthMeters ?? 0),
-            RouteDurationSeconds = segments.All(segment => segment.DurationSeconds.HasValue)
-                ? segments.Sum(segment => segment.DurationSeconds!.Value)
-                : null,
+            ProviderEstimatedTravelTimeSeconds = null,
             Segments = segments,
             MissingData = segments
                 .SelectMany(segment => segment.MissingData)
@@ -102,7 +110,6 @@ public sealed class ModelService
     private static IReadOnlyCollection<string> MissingFields(RouteSegmentInput segment)
     {
         var missing = new List<string>();
-        if (!segment.DurationSeconds.HasValue) missing.Add("durationSeconds");
         if (string.IsNullOrWhiteSpace(segment.RoadType)) missing.Add("roadType");
         if (!segment.SpeedLimitKmh.HasValue) missing.Add("speedLimitKmh");
         if (!segment.LaneCount.HasValue) missing.Add("laneCount");

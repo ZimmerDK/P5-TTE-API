@@ -25,13 +25,18 @@ public sealed record RouteRequest
 
 public sealed record RouteSegmentInput
 {
+    /// <summary>Physical length, in meters, of this caller-supplied route segment.</summary>
     public double LengthMeters { get; init; }
-    public double? DurationSeconds { get; init; }
+    /// <summary>Road classification reported by the caller when known.</summary>
     public string? RoadType { get; init; }
+    /// <summary>Posted or inferred speed limit in kilometres per hour.</summary>
     public double? SpeedLimitKmh { get; init; }
+    /// <summary>Number of lanes when known.</summary>
     public int? LaneCount { get; init; }
+    /// <summary>Whether this segment is part of a roundabout.</summary>
     public bool? IsRoundabout { get; init; }
+    /// <summary>Whether a traffic signal is associated with this segment.</summary>
     public bool? HasTrafficSignal { get; init; }
+    /// <summary>Whether this segment represents an intersection.</summary>
     public bool? IsIntersection { get; init; }
-    public List<long> NodeIds { get; init; } = [];
 }

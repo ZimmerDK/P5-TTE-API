@@ -4,6 +4,8 @@ namespace TimeEstimationAPI.Models;
 public sealed class RouteResponse
 {
     public double EstimatedTravelTimeSeconds { get; set; }
+    public double? ProviderEstimatedTravelTimeSeconds { get; set; }
+    public string? ProviderName { get; set; }
     public double DistanceMeters { get; set; }
     public string ModelName { get; set; } = "route_time_model_v1";
     public UnifiedRoute? Route { get; set; }

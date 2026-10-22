@@ -1,10 +1,13 @@
 using TimeEstimationAPI.Models;
+using Microsoft.Extensions.Options;
 
 namespace TimeEstimationAPI.Services;
 
 /// <summary>Maps each ordered route segment to one model sequence row.</summary>
-public sealed class FeatureTransformer
+public sealed class FeatureTransformer(IOptions<RouteModelOptions> options)
 {
+    private readonly RouteModelOptions _options = options.Value;
+
     public RouteFeatureVector Transform(UnifiedRoute route)
     {
         // TODO: Confirm whether MLM training uses UTC, the route's local timezone, or another explicit timezone.
@@ -48,15 +51,14 @@ public sealed class FeatureTransformer
                 segment.HasTrafficSignal == true ? 1.0 : 0.0,
                 segment.IsIntersection == true ? 1.0 : 0.0,
                 1.0, // urban/weather data is not supplied by the providers yet
-                segment.MissingData.Count > 0 || route.MissingData.Count > 0 ? 1.0 : 0.0,
-                Math.Max(segment.DurationSeconds ?? 0, 0) / 3600.0
+                segment.MissingData.Count > 0 || route.MissingData.Count > 0 ? 1.0 : 0.0
             })
             .ToArray();
         var localDeparture = route.DepartureTime.ToLocalTime();
         var segmentFeatures = orderedSegments
             .Select(segment => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
             {
-                ["matched_length_m"] = Math.Max(segment.LengthMeters ?? 0, 0),
+                ["matched_length_m"] = CapMatchedLength(segment.LengthMeters),
                 ["hour"] = localDeparture.Hour,
                 ["minute"] = localDeparture.Minute,
                 ["day_of_week"] = (int)localDeparture.DayOfWeek,
@@ -97,4 +99,12 @@ public sealed class FeatureTransformer
             "secondary" => 1.5,
             _ => 1
         };
+
+    private double CapMatchedLength(double? lengthMeters)
+    {
+        var length = Math.Max(lengthMeters ?? 0, 0);
+        return _options.MaxMatchedLengthMeters > 0
+            ? Math.Min(length, _options.MaxMatchedLengthMeters)
+            : length;
+    }
 }

@@ -22,7 +22,7 @@ public sealed class ProviderRouteResult
 {
     public string Provider { get; set; } = "OSRM";
     public double? DistanceMeters { get; set; }
-    public double? DurationSeconds { get; set; }
+    public double? ProviderEstimatedDurationSeconds { get; set; }
     public string? RoadType { get; set; }
     public double? SpeedLimitKmh { get; set; }
     public int? TrafficSignalCount { get; set; }
@@ -75,7 +75,7 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
         {
             Provider = Name,
             DistanceMeters = route.GetProperty("distance").GetDouble(),
-            DurationSeconds = ParseDuration(route.GetProperty("duration")),
+            ProviderEstimatedDurationSeconds = ParseDuration(route.GetProperty("duration")),
             TrafficSignalCount = CountTrafficSignals(segments),
             MissingFields = ["roadType", "speedLimitKmh", "laneCount"],
             Geometry = ParseGeometry(route),
@@ -107,7 +107,7 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
                 {
                     Sequence = sequence++,
                     LengthMeters = GetDouble(step, "distance"),
-                    DurationSeconds = GetDouble(step, "duration"),
+                    ProviderEstimatedDurationSeconds = GetDouble(step, "duration"),
                     LaneCount = laneCount > 0 ? laneCount : null,
                     IsRoundabout = isRoundabout,
                     HasTrafficSignal = hasSignal,
@@ -193,10 +193,10 @@ public sealed class DevelopmentRouteProvider : IRouteProvider
             {
                 Sequence = index,
                 LengthMeters = 6500d / segmentCount,
-                DurationSeconds = null,
+                ProviderEstimatedDurationSeconds = null,
                 RoadType = "primary",
                 SpeedLimitKmh = 50,
-                MissingData = ["durationSeconds"]
+                MissingData = ["providerEstimatedDurationSeconds"]
             })
             .ToArray();
 
@@ -206,7 +206,7 @@ public sealed class DevelopmentRouteProvider : IRouteProvider
             DistanceMeters = 6500,
             RoadType = "primary",
             SpeedLimitKmh = 50,
-            MissingFields = ["durationSeconds", "trafficSignalCount"],
+            MissingFields = ["providerEstimatedDurationSeconds", "trafficSignalCount"],
             Segments = segments
         });
     }

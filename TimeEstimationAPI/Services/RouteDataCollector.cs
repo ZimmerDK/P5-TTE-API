@@ -44,7 +44,8 @@ public sealed class RouteDataCollector(
 
         var missingData = new HashSet<string>(primary.MissingFields, StringComparer.OrdinalIgnoreCase);
         if (!primary.DistanceMeters.HasValue) missingData.Add("distanceMeters");
-        if (!primary.DurationSeconds.HasValue) missingData.Add("durationSeconds");
+        if (!primary.ProviderEstimatedDurationSeconds.HasValue)
+            missingData.Add("providerEstimatedDurationSeconds");
         if (!primary.SpeedLimitKmh.HasValue) missingData.Add("speedLimitKmh");
         if (string.IsNullOrWhiteSpace(primary.RoadType)) missingData.Add("roadType");
         if (primary.Segments.Count == 0) missingData.Add("segments");
@@ -60,7 +61,8 @@ public sealed class RouteDataCollector(
             RoadType = primary.RoadType,
             SpeedLimitKmh = primary.SpeedLimitKmh,
             TrafficSignalCount = primary.TrafficSignalCount,
-            RouteDurationSeconds = primary.DurationSeconds,
+            ProviderEstimatedTravelTimeSeconds = primary.ProviderEstimatedDurationSeconds,
+            SelectedProvider = primary.Provider,
             Geometry = primary.Geometry,
             Segments = primary.Segments,
             MissingData = missingData,
@@ -74,7 +76,7 @@ public sealed class RouteDataCollector(
         {
             Provider = data.Provider,
             DistanceMeters = data.DistanceMeters,
-            DurationSeconds = data.DurationSeconds,
+            ProviderEstimatedDurationSeconds = data.ProviderEstimatedDurationSeconds,
             RoadType = data.RoadType,
             SpeedLimitKmh = data.SpeedLimitKmh,
             TrafficSignalCount = data.TrafficSignalCount,

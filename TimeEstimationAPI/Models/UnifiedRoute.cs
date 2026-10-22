@@ -8,7 +8,7 @@ public sealed record RouteSegment
     public IReadOnlyList<RoutePoint> Geometry { get; init; } = [];
     public IReadOnlyList<long> NodeIds { get; init; } = [];
     public double? LengthMeters { get; init; }
-    public double? DurationSeconds { get; init; }
+    public double? ProviderEstimatedDurationSeconds { get; init; }
     public string? RoadType { get; init; }
     public double? SpeedLimitKmh { get; init; }
     public int? LaneCount { get; init; }
@@ -24,7 +24,7 @@ public sealed record RouteProviderData
 {
     public required string Provider { get; init; }
     public double? DistanceMeters { get; init; }
-    public double? DurationSeconds { get; init; }
+    public double? ProviderEstimatedDurationSeconds { get; init; }
     public string? RoadType { get; init; }
     public double? SpeedLimitKmh { get; init; }
     public int? TrafficSignalCount { get; init; }
@@ -52,7 +52,8 @@ public sealed record UnifiedRoute
     public string? RoadType { get; init; }
     public double? SpeedLimitKmh { get; init; }
     public int? TrafficSignalCount { get; init; }
-    public double? RouteDurationSeconds { get; init; }
+    public double? ProviderEstimatedTravelTimeSeconds { get; init; }
+    public string? SelectedProvider { get; init; }
     public IReadOnlyCollection<string> MissingData { get; init; } = [];
     public IReadOnlyList<RouteProviderData> ProviderData { get; init; } = [];
 }
