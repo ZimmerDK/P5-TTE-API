@@ -22,7 +22,7 @@ public sealed class ProviderRouteResult
 {
     public string Provider { get; set; } = "OSRM";
     public double? DistanceMeters { get; set; }
-    public double? ProviderEstimatedDurationSeconds { get; set; }
+    public double? ProviderRouteTimeSeconds { get; set; }
     public string? RoadType { get; set; }
     public double? SpeedLimitKmh { get; set; }
     public int? TrafficSignalCount { get; set; }
@@ -38,6 +38,7 @@ public sealed class OsmOptions
     public bool UseOsrm { get; set; }
     public string GeocodingUrl { get; set; } = "https://nominatim.openstreetmap.org/search";
     public string RoutingUrl { get; set; } = "https://router.project-osrm.org/route/v1/driving";
+    public string OverpassUrl { get; set; } = "https://overpass-api.de/api/interpreter";
 }
 
 /// <summary>Geocode stops, asks OSRM for route steps, then maps them to segments.</summary>
@@ -75,7 +76,7 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
         {
             Provider = Name,
             DistanceMeters = route.GetProperty("distance").GetDouble(),
-            ProviderEstimatedDurationSeconds = ParseDuration(route.GetProperty("duration")),
+            ProviderRouteTimeSeconds = ParseDuration(route.GetProperty("duration")),
             TrafficSignalCount = CountTrafficSignals(segments),
             MissingFields = ["roadType", "speedLimitKmh", "laneCount"],
             Geometry = ParseGeometry(route),
@@ -107,11 +108,12 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
                 {
                     Sequence = sequence++,
                     LengthMeters = GetDouble(step, "distance"),
-                    ProviderEstimatedDurationSeconds = GetDouble(step, "duration"),
+                    ProviderSegmentTimeSeconds = GetDouble(step, "duration"),
                     LaneCount = laneCount > 0 ? laneCount : null,
                     IsRoundabout = isRoundabout,
                     HasTrafficSignal = hasSignal,
                     IsIntersection = intersections.Length > 1,
+                    Geometry = ParseStepGeometry(step),
                     MissingData = laneCount > 0
                         ? ["roadType", "speedLimitKmh", "nodeIds"]
                         : ["roadType", "speedLimitKmh", "laneCount", "nodeIds"]
@@ -139,6 +141,18 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
     private static IReadOnlyList<RoutePoint> ParseGeometry(JsonElement route)
     {
         if (!route.TryGetProperty("geometry", out var geometry) ||
+            !geometry.TryGetProperty("coordinates", out var coordinates))
+            return [];
+
+        return coordinates.EnumerateArray()
+            .Where(point => point.GetArrayLength() >= 2)
+            .Select(point => new RoutePoint(point[0].GetDouble(), point[1].GetDouble()))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<RoutePoint> ParseStepGeometry(JsonElement step)
+    {
+        if (!step.TryGetProperty("geometry", out var geometry) ||
             !geometry.TryGetProperty("coordinates", out var coordinates))
             return [];
 
@@ -193,10 +207,10 @@ public sealed class DevelopmentRouteProvider : IRouteProvider
             {
                 Sequence = index,
                 LengthMeters = 6500d / segmentCount,
-                ProviderEstimatedDurationSeconds = null,
+                ProviderSegmentTimeSeconds = null,
                 RoadType = "primary",
                 SpeedLimitKmh = 50,
-                MissingData = ["providerEstimatedDurationSeconds"]
+                MissingData = ["providerSegmentTimeSeconds"]
             })
             .ToArray();
 
@@ -206,7 +220,7 @@ public sealed class DevelopmentRouteProvider : IRouteProvider
             DistanceMeters = 6500,
             RoadType = "primary",
             SpeedLimitKmh = 50,
-            MissingFields = ["providerEstimatedDurationSeconds", "trafficSignalCount"],
+            MissingFields = ["providerRouteTimeSeconds", "trafficSignalCount"],
             Segments = segments
         });
     }

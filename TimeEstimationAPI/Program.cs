@@ -24,6 +24,11 @@ builder.Services.AddHttpClient<ValhallaService>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
 });
+builder.Services.AddHttpClient<OsmTagEnricher>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
+});
 builder.Services.AddHttpClient<PythonModelRunner>();
 // Keep the rest of the app independent from the actual route-data source.
 // Development uses stable local data; setting Osm:UseOsrm switches to live calls.
@@ -98,6 +103,62 @@ app.MapPost("/api/routes/estimate", async (RouteRequest request, ModelService mo
 .Produces<RouteResponse>(StatusCodes.Status200OK)
 .ProducesValidationProblem()
 .ProducesProblem(StatusCodes.Status400BadRequest)
+.ProducesProblem(StatusCodes.Status502BadGateway)
+.ProducesProblem(StatusCodes.Status500InternalServerError);
+
+app.MapPost("/api/routes/provider-data", async (
+    RouteRequest request,
+    RouteDataCollector routeDataCollector,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Source) || string.IsNullOrWhiteSpace(request.Destination))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["route"] = ["Provide both source and destination for provider data."]
+        });
+    }
+
+    if (request.Via.Any(string.IsNullOrWhiteSpace))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["via"] = ["Via locations must not be empty."]
+        });
+    }
+
+    var route = await routeDataCollector.CollectAsync(request, cancellationToken);
+    return Results.Ok(route);
+})
+.WithName("GetRouteProviderData")
+.WithSummary("Gets provider route data without running the model.")
+.WithDescription("Geocodes the route, queries the configured routing provider, enriches OSRM segments with OSM tags, and returns provider data only.")
+.Produces<UnifiedRoute>(StatusCodes.Status200OK)
+.ProducesValidationProblem()
+.ProducesProblem(StatusCodes.Status502BadGateway)
+.ProducesProblem(StatusCodes.Status500InternalServerError);
+
+app.MapPost("/api/routes/model-only", async (
+    RouteRequest request,
+    ModelService modelService,
+    CancellationToken cancellationToken) =>
+{
+    if (request.Via.Any(string.IsNullOrWhiteSpace))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["via"] = ["Via locations must not be empty."]
+        });
+    }
+
+    var result = await modelService.EstimateSegmentsAsync(request, cancellationToken);
+    return Results.Ok(result);
+})
+.WithName("EstimateModelFromSegments")
+.WithSummary("Estimates travel time from supplied segments using only the model.")
+.WithDescription("Transforms explicit segment features and calls the configured Python model service without querying a route provider.")
+.Produces<RouteResponse>(StatusCodes.Status200OK)
+.ProducesValidationProblem()
 .ProducesProblem(StatusCodes.Status502BadGateway)
 .ProducesProblem(StatusCodes.Status500InternalServerError);
 

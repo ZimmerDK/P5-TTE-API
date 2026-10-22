@@ -1,10 +1,79 @@
-@baseUrl = http://localhost:5073
+@apiBaseUrl = http://localhost:5073
+@pythonBaseUrl = http://127.0.0.1:8001
 
-### Health
-GET {{baseUrl}}/health
+# ==========================================
+# Python Model Service
+# ==========================================
 
-### Estimate route
-POST {{baseUrl}}/api/routes/estimate
+### Python Health Check
+GET {{pythonBaseUrl}}/health
+
+### Python Model Info
+GET {{pythonBaseUrl}}/model-info
+
+### Predict Route Time (Python Service)
+POST {{pythonBaseUrl}}/predict
+Content-Type: application/json
+
+{
+  "modelName": "route_time_model_v1",
+  "segmentFeatures": [
+    {
+      "matched_length_m": 67,
+      "hour": 8,
+      "minute": 30,
+      "day_of_week": 3,
+      "month": 10,
+      "speed_limit_kmh": 50,
+      "density": 0,
+      "lane_count": 2,
+      "bridge": 0,
+      "tunnel": 0,
+      "roundabout": 0,
+      "internal_intersection": 1
+    },
+    {
+      "matched_length_m": 42,
+      "hour": 8,
+      "minute": 31,
+      "day_of_week": 3,
+      "month": 10,
+      "speed_limit_kmh": 110,
+      "density": 0,
+      "lane_count": 3,
+      "bridge": 1,
+      "tunnel": 0,
+      "roundabout": 0,
+      "internal_intersection": 0
+    },
+    {
+      "matched_length_m": 150,
+      "hour": 8,
+      "minute": 32,
+      "day_of_week": 3,
+      "month": 10,
+      "speed_limit_kmh": 80,
+      "density": 0,
+      "lane_count": 2,
+      "bridge": 0,
+      "tunnel": 0,
+      "roundabout": 1,
+      "internal_intersection": 0
+    }
+  ],
+  "routeFeatures": {},
+  "timeFeatures": {}
+}
+
+# ==========================================
+# Route API (ASP.NET Service)
+# ==========================================
+
+### API Health Check
+GET {{apiBaseUrl}}/health
+
+### Estimate Route with Provider and Model
+POST {{apiBaseUrl}}/api/routes/estimate
 Content-Type: application/json
 
 {
@@ -15,40 +84,64 @@ Content-Type: application/json
   "mode": "car"
 }
 
-### Estimate an explicitly supplied segment route
-POST {{baseUrl}}/api/routes/estimate
+### Provider Route Data and OSM Enrichment Only
+POST {{apiBaseUrl}}/api/routes/provider-data
 Content-Type: application/json
 
 {
-  "source": "Segment route start",
-  "destination": "Segment route end",
+  "source": "Stockholm",
+  "destination": "Gothenburg",
   "via": [],
+  "departureTime": "2026-10-22T08:30:00+02:00",
+  "mode": "car"
+}
+
+### Model-only Estimate from Explicit Segments
+POST {{apiBaseUrl}}/api/routes/model-only
+Content-Type: application/json
+
+{
   "segments": [
     {
-      "lengthMeters": 1000,
-      "roadType": "primary",
+      "lengthMeters": 67,
+      "roadType": "residential",
       "speedLimitKmh": 50,
       "laneCount": 2,
       "isRoundabout": false,
       "hasTrafficSignal": true,
-      "isIntersection": true
+      "isIntersection": true,
+      "isBridge": false,
+      "isTunnel": false
     },
     {
-      "lengthMeters": 500,
-      "roadType": "secondary",
-      "speedLimitKmh": 30,
-      "laneCount": 1,
+      "lengthMeters": 42,
+      "roadType": "motorway",
+      "speedLimitKmh": 110,
+      "laneCount": 3,
+      "isRoundabout": false,
+      "hasTrafficSignal": false,
+      "isIntersection": false,
+      "isBridge": true,
+      "isTunnel": false
+    },
+    {
+      "lengthMeters": 150,
+      "roadType": "primary",
+      "speedLimitKmh": 80,
+      "laneCount": 2,
       "isRoundabout": true,
       "hasTrafficSignal": false,
-      "isIntersection": true
+      "isIntersection": false,
+      "isBridge": false,
+      "isTunnel": false
     }
   ],
   "departureTime": "2026-10-22T08:30:00+02:00",
   "mode": "car"
 }
 
-### Invalid estimate
-POST {{baseUrl}}/api/routes/estimate
+### Invalid Estimate Validation Check
+POST {{apiBaseUrl}}/api/routes/estimate
 Content-Type: application/json
 
 {

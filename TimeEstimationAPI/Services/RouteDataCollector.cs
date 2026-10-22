@@ -6,7 +6,8 @@ using System.Text.Json;
 /// <summary>Gets provider data and folds it into one route object for the model.</summary>
 public sealed class RouteDataCollector(
     IEnumerable<IRouteProvider> providers,
-    ILogger<RouteDataCollector> logger)
+    ILogger<RouteDataCollector> logger,
+    OsmTagEnricher osmTagEnricher)
 {
     /// <summary>Collects route data and records which fields were not available.</summary>
     public async Task<UnifiedRoute> CollectAsync(RouteRequest request, CancellationToken cancellationToken)
@@ -22,6 +23,9 @@ public sealed class RouteDataCollector(
             {
                 var data = await provider.GetRouteMetadataAsync(
                     source, destination, request.Via, cancellationToken);
+                // OSRM supplies the route geometry; Overpass supplies the OSM tags.
+                if (provider is OsrmService)
+                    data.Segments = await osmTagEnricher.EnrichAsync(data.Segments, cancellationToken);
                 providerData.Add(ToProviderData(data));
             }
             catch (HttpRequestException exception)
@@ -44,8 +48,8 @@ public sealed class RouteDataCollector(
 
         var missingData = new HashSet<string>(primary.MissingFields, StringComparer.OrdinalIgnoreCase);
         if (!primary.DistanceMeters.HasValue) missingData.Add("distanceMeters");
-        if (!primary.ProviderEstimatedDurationSeconds.HasValue)
-            missingData.Add("providerEstimatedDurationSeconds");
+        if (!primary.ProviderRouteTimeSeconds.HasValue)
+            missingData.Add("providerRouteTimeSeconds");
         if (!primary.SpeedLimitKmh.HasValue) missingData.Add("speedLimitKmh");
         if (string.IsNullOrWhiteSpace(primary.RoadType)) missingData.Add("roadType");
         if (primary.Segments.Count == 0) missingData.Add("segments");
@@ -61,7 +65,7 @@ public sealed class RouteDataCollector(
             RoadType = primary.RoadType,
             SpeedLimitKmh = primary.SpeedLimitKmh,
             TrafficSignalCount = primary.TrafficSignalCount,
-            ProviderEstimatedTravelTimeSeconds = primary.ProviderEstimatedDurationSeconds,
+            ProviderRouteTimeSeconds = primary.ProviderRouteTimeSeconds,
             SelectedProvider = primary.Provider,
             Geometry = primary.Geometry,
             Segments = primary.Segments,
@@ -76,7 +80,7 @@ public sealed class RouteDataCollector(
         {
             Provider = data.Provider,
             DistanceMeters = data.DistanceMeters,
-            ProviderEstimatedDurationSeconds = data.ProviderEstimatedDurationSeconds,
+            ProviderRouteTimeSeconds = data.ProviderRouteTimeSeconds,
             RoadType = data.RoadType,
             SpeedLimitKmh = data.SpeedLimitKmh,
             TrafficSignalCount = data.TrafficSignalCount,

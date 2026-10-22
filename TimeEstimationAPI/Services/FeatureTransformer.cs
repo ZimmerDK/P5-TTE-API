@@ -1,13 +1,10 @@
 using TimeEstimationAPI.Models;
-using Microsoft.Extensions.Options;
 
 namespace TimeEstimationAPI.Services;
 
 /// <summary>Maps each ordered route segment to one model sequence row.</summary>
-public sealed class FeatureTransformer(IOptions<RouteModelOptions> options)
+public sealed class FeatureTransformer
 {
-    private readonly RouteModelOptions _options = options.Value;
-
     public RouteFeatureVector Transform(UnifiedRoute route)
     {
         // TODO: Confirm whether MLM training uses UTC, the route's local timezone, or another explicit timezone.
@@ -58,7 +55,7 @@ public sealed class FeatureTransformer(IOptions<RouteModelOptions> options)
         var segmentFeatures = orderedSegments
             .Select(segment => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
             {
-                ["matched_length_m"] = CapMatchedLength(segment.LengthMeters),
+                ["matched_length_m"] = Math.Max(segment.LengthMeters ?? 0, 0),
                 ["hour"] = localDeparture.Hour,
                 ["minute"] = localDeparture.Minute,
                 ["day_of_week"] = (int)localDeparture.DayOfWeek,
@@ -66,8 +63,8 @@ public sealed class FeatureTransformer(IOptions<RouteModelOptions> options)
                 ["speed_limit_kmh"] = Math.Max(segment.SpeedLimitKmh ?? 0, 0),
                 ["density"] = 0,
                 ["lane_count"] = Math.Max(segment.LaneCount ?? 0, 0),
-                ["bridge"] = 0,
-                ["tunnel"] = 0,
+                ["bridge"] = segment.IsBridge == true ? 1 : 0,
+                ["tunnel"] = segment.IsTunnel == true ? 1 : 0,
                 ["roundabout"] = segment.IsRoundabout == true ? 1 : 0,
                 ["internal_intersection"] = segment.IsIntersection == true ? 1 : 0
             })
@@ -100,11 +97,4 @@ public sealed class FeatureTransformer(IOptions<RouteModelOptions> options)
             _ => 1
         };
 
-    private double CapMatchedLength(double? lengthMeters)
-    {
-        var length = Math.Max(lengthMeters ?? 0, 0);
-        return _options.MaxMatchedLengthMeters > 0
-            ? Math.Min(length, _options.MaxMatchedLengthMeters)
-            : length;
-    }
 }

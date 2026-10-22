@@ -46,10 +46,10 @@ community services with usage policies and rate limits, so they are suitable
 for occasional development requests, not guaranteed production availability.
 
 ## What it does
-`POST /api/routes/estimate` takes an ordered list of route segments, departure
-time, and travel mode. For convenience during development it can also take a
-source, destination, and optional via locations and ask a routing provider to
-build the segments. The API then:
+`POST /api/routes/estimate` is the main combined endpoint. It takes an ordered
+list of route segments, departure time, and travel mode. For convenience
+during development it can also take a source, destination, and optional via
+locations and ask a routing provider to build the segments. The API then:
 
 1. asks the enabled route provider(s) for a route and its ordered segments;
 2. chooses the available primary result and records all provider results;
@@ -57,14 +57,30 @@ build the segments. The API then:
 4. calls the configured Python model service, or runs a simple placeholder calculation;
 5. returns the estimate together with the route data used.
 
+`POST /api/routes/provider-data` is a provider diagnostic endpoint. It accepts
+source, destination, and optional via locations, then returns the selected
+provider route, provider timings, geometry, segments, OSM enrichment, and
+provider diagnostics without calling the model.
+
+`POST /api/routes/model-only` is a model diagnostic endpoint. It accepts
+explicit segments and calls the configured Python model without querying
+Nominatim, OSRM, Valhalla, or Overpass. This is useful for controlled model
+tests and feature debugging.
+
+The endpoint names are intentionally explicit:
+
+- `estimate` means the complete application flow.
+- `provider-data` means routing and OSM/provider diagnostics only.
+- `model-only` means model prediction from caller-supplied segments only.
+
 `GET /health` is a basic liveness check.
 
 ### Request using an explicit segment collection
 
 When `segments` is present, it is the route input. The API preserves the
 segment order, creates one model row per segment, predicts each row, and sums
-the resulting `predictedDurationSeconds` values into
-`estimatedTravelTimeSeconds`.
+the resulting `modelSegmentTimeSeconds` values into
+`modelRouteTimeSeconds`.
 
 ```json
 {
@@ -79,7 +95,9 @@ the resulting `predictedDurationSeconds` values into
       "laneCount": 2,
       "isRoundabout": false,
       "hasTrafficSignal": true,
-      "isIntersection": true
+      "isIntersection": true,
+      "isBridge": false,
+      "isTunnel": false
     },
     {
       "lengthMeters": 500,
@@ -88,7 +106,9 @@ the resulting `predictedDurationSeconds` values into
       "laneCount": 1,
       "isRoundabout": true,
       "hasTrafficSignal": false,
-      "isIntersection": true
+      "isIntersection": true,
+      "isBridge": false,
+      "isTunnel": false
     }
   ],
   "departureTime": "2026-10-22T08:30:00+02:00",
@@ -105,13 +125,13 @@ The response includes one prediction per route segment:
 
 ```json
 {
-  "estimatedTravelTimeSeconds": 135.4,
-  "distanceMeters": 1500,
+  "modelRouteTimeSeconds": 135.4,
+  "routeDistanceM": 1500,
   "modelName": "route_time_model_v1",
   "route": {
     "segments": [
-      { "sequence": 0, "predictedDurationSeconds": 75.1 },
-      { "sequence": 1, "predictedDurationSeconds": 60.3 }
+      { "sequence": 0, "modelSegmentTimeSeconds": 75.1 },
+      { "sequence": 1, "modelSegmentTimeSeconds": 60.3 }
     ]
   }
 }
@@ -123,12 +143,11 @@ total as the sum of the segment predictions.
 Provider duration is deliberately not accepted in a manually supplied request.
 When the route is obtained from OSRM or Valhalla, the provider's segment
 duration is returned inside provider diagnostics as
-`providerEstimatedDurationSeconds`. It is not the model prediction.
+`providerSegmentTimeSeconds`. It is not the model prediction.
 
-`matched_length_m` is the model input derived from `lengthMeters`. Until the
-model is retrained on longer segments, the default temporary cap is 67 metres.
-Configure it with `Model:MaxMatchedLengthMeters`, or set it to `0` to disable
-the cap. The physical route segment length remains unchanged in the response.
+`matched_length_m` is the model input derived directly from `lengthMeters`.
+There is no application-side cap; keep manual segment lengths within the
+range supported by the current model until it has been retrained.
 
 ### Request using provider routing
 
@@ -153,14 +172,63 @@ For a provider-routed request, the response also contains:
 
 ```json
 {
-  "providerName": "OSRM",
-  "providerEstimatedTravelTimeSeconds": 1234.5
+  "routeProvider": "OSRM",
+  "providerRouteTimeSeconds": 1234.5
 }
 ```
 
 These fields are the whole-route provider estimate. Compare them with
-`estimatedTravelTimeSeconds`, which is the sum of the model's individual
+`modelRouteTimeSeconds`, which is the sum of the model's individual
 segment predictions.
+
+### Provider data only
+
+Use this endpoint to inspect routing and OSM enrichment without involving the
+model:
+
+```json
+{
+  "source": "Stockholm",
+  "destination": "Gothenburg",
+  "via": [],
+  "departureTime": "2026-10-22T08:30:00+02:00",
+  "mode": "car"
+}
+```
+
+The response is a `UnifiedRoute` object. For OSRM routes, enriched segments
+can include `osmWayId`, `roadType`, `speedLimitKmh`, `laneCount`, `isBridge`,
+and `isTunnel`. `osmWayId` is the best Overpass geometric match for
+diagnostics; it is not a guarantee that OSRM exposed or used that exact OSM
+way.
+
+### Model estimate from explicit segments
+
+Use this endpoint when provider routing is not part of the test:
+
+```json
+{
+  "segments": [
+    {
+      "lengthMeters": 1000,
+      "roadType": "residential",
+      "speedLimitKmh": 50,
+      "laneCount": 2,
+      "isRoundabout": false,
+      "hasTrafficSignal": true,
+      "isIntersection": true,
+      "isBridge": false,
+      "isTunnel": false
+    }
+  ],
+  "departureTime": "2026-10-22T08:30:00+02:00",
+  "mode": "car"
+}
+```
+
+It returns the same model estimate shape as the combined endpoint, including
+`modelRouteTimeSeconds` and per-segment `modelSegmentTimeSeconds`, but has no
+provider route time because no provider was queried.
 
 ## Current scope and important limitation
 The canonical input is `segments`. Each segment is one road part in travel
@@ -297,7 +365,7 @@ The current OSRM adapter requests full geometry, steps, and annotations. It
 geocodes the source, destination, and via locations with Nominatim, maps OSRM
 steps to ordered route segments, and reads each step's distance, duration,
 intersection, traffic-signal, and available lane information. Its route
-summary duration is returned as `providerEstimatedTravelTimeSeconds` for
+summary duration is returned as `providerRouteTimeSeconds` for
 comparison with the model's summed segment prediction.
 
 The `departureTime` value is accepted and used for model features. The public
@@ -310,6 +378,44 @@ OSM is map data rather than a time-estimation API. Nominatim provides
 geocoding, while OSRM provides routing and step durations from OSM-derived
 data. Querying raw OSM tags alone cannot produce a time-of-day ETA; that
 requires a routing engine with a traffic/time model.
+
+OSRM does not reliably return every OSM way tag. Whenever OSRM routing is
+enabled, the API automatically sends one or more bounded Overpass queries for
+the route area and matches each OSRM step to the nearest OSM `highway` way.
+The `highway` filter means “mapped road/path/track way”, not necessarily a
+motorway. It provides tags such as `highway=primary`, `highway=residential`,
+or `highway=service`; those tags are used to fill missing segment attributes.
+They do not prove that the route travelled that way.
+
+Matching uses the complete OSRM step geometry rather than only its midpoint.
+This makes parallel urban roads and ramps less likely to receive tags from a
+nearby road. A candidate is accepted only when every OSRM geometry point is
+within `0.0001` degrees, roughly 11 metres north/south, of that OSM way. This
+is a geographic safety threshold, not the width of a road; its metre
+equivalent depends slightly on latitude. A smaller threshold can reduce false
+matches, while a larger threshold can recover incomplete or imprecise map
+geometry. Each query covers at most `0.22` degrees north/south and east/west,
+roughly 24 km north/south, so long routes are split into smaller query boxes
+instead of being skipped entirely.
+
+This can fill `roadType`, `speedLimitKmh`, `laneCount`, `isBridge`, and
+`isTunnel`. The match remains best-effort: a two-dimensional map lookup cannot
+reliably distinguish an overpass from the road directly underneath when their
+coordinates overlap. Existing positive provider bridge/tunnel information is
+preserved, and the original OSRM segment is retained if Overpass is unavailable or no nearby way
+is found. A matched segment also exposes `osmWayId`; this is the OpenStreetMap
+way ID returned by Overpass for the best geometric match. It is useful for
+diagnostics and later inspection, but it is not proof that OSRM used that way.
+The public OSRM response does not reliably provide OSM way IDs for each step,
+and obtaining the ID here does not require payment. This approach is suitable
+for urban routes, but it is not a full map-matching engine and should not be
+treated as authoritative road identity.
+
+Nominatim, OSRM, and Overpass are free public community services. They require
+no API key here, but they have rate limits and no uptime guarantee. For
+stability without paying, keep requests occasional, cache route results when
+possible, use a clear User-Agent, and avoid parallel bulk requests. A fully
+reliable high-volume setup requires self-hosting the data/services.
 
 ### Valhalla
 Enable a local Valhalla service with:
@@ -344,8 +450,7 @@ Development uses the placeholder by default:
   "UsePythonService": false,
   "PythonServiceUrl": "http://localhost:8001",
   "PythonServiceTimeoutSeconds": 30,
-  "PlaceholderAverageSpeedKmh": 40,
-  "MaxMatchedLengthMeters": 67
+  "PlaceholderAverageSpeedKmh": 40
 }
 ```
 
@@ -394,7 +499,7 @@ before using production estimates.
 The Python service is configured for segment-level input. Each ordered route
 segment becomes one row containing the model's 12 features. The Python service
 predicts every row and sums those predictions into the route estimate.
-`route.segments[*].predictedDurationSeconds` contains the individual segment
+`route.segments[*].modelSegmentTimeSeconds` contains the individual segment
 predictions.
 
 The ASP.NET adapter sends named `routeFeatures`, `segmentFeatures`, and

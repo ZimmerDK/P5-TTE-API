@@ -56,12 +56,12 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = document.RootElement;
 
-        Assert.True(root.GetProperty("estimatedTravelTimeSeconds").GetDouble() > 0);
+        Assert.True(root.GetProperty("modelRouteTimeSeconds").GetDouble() > 0);
         Assert.Equal("Stockholm", root.GetProperty("route").GetProperty("source").GetString());
         Assert.Equal("development-stub", root.GetProperty("route")
             .GetProperty("providerData")[0].GetProperty("provider").GetString());
         Assert.True(root.GetProperty("route").GetProperty("segments").GetArrayLength() > 0);
-        Assert.Contains("providerEstimatedDurationSeconds", root.GetProperty("features")
+        Assert.Contains("providerRouteTimeSeconds", root.GetProperty("features")
             .GetProperty("missingDataFields").EnumerateArray().Select(value => value.GetString()));
     }
 
@@ -115,10 +115,60 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         var root = document.RootElement;
         Assert.Equal(2, root.GetProperty("route").GetProperty("segments").GetArrayLength());
         Assert.All(root.GetProperty("route").GetProperty("segments").EnumerateArray(),
-            segment => Assert.True(segment.GetProperty("predictedDurationSeconds").GetDouble() > 0));
-        var total = root.GetProperty("estimatedTravelTimeSeconds").GetDouble();
+            segment => Assert.True(segment.GetProperty("modelSegmentTimeSeconds").GetDouble() > 0));
+        var total = root.GetProperty("modelRouteTimeSeconds").GetDouble();
         var segmentTotal = root.GetProperty("route").GetProperty("segments").EnumerateArray()
-            .Sum(segment => segment.GetProperty("predictedDurationSeconds").GetDouble());
+            .Sum(segment => segment.GetProperty("modelSegmentTimeSeconds").GetDouble());
         Assert.Equal(segmentTotal, total, precision: 10);
+    }
+
+    [Fact]
+    public async Task Provider_data_returns_route_without_model_prediction()
+    {
+        var response = await _client.PostAsJsonAsync("/api/routes/provider-data", new
+        {
+            source = "Stockholm",
+            destination = "Gothenburg",
+            via = Array.Empty<string>(),
+            departureTime = "2026-09-24T08:30:00Z",
+            mode = "car"
+        });
+
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        Assert.True(root.GetProperty("segments").GetArrayLength() > 0);
+        Assert.False(root.TryGetProperty("modelRouteTimeSeconds", out _));
+    }
+
+    [Fact]
+    public async Task Model_estimate_accepts_explicit_segments_without_provider_routing()
+    {
+        var response = await _client.PostAsJsonAsync("/api/routes/model-only", new
+        {
+            segments = new[]
+            {
+                new
+                {
+                    lengthMeters = 1000,
+                    roadType = "residential",
+                    speedLimitKmh = 50,
+                    laneCount = 2,
+                    isRoundabout = false,
+                    hasTrafficSignal = true,
+                    isIntersection = true,
+                    isBridge = false,
+                    isTunnel = false
+                }
+            },
+            departureTime = "2026-09-24T08:30:00Z",
+            mode = "car"
+        });
+
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        Assert.True(root.GetProperty("modelRouteTimeSeconds").GetDouble() > 0);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("providerRouteTimeSeconds").ValueKind);
     }
 }

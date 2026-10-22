@@ -36,13 +36,13 @@ public sealed class ModelService
 
         var vector = _featureTransformer.Transform(route);
         var prediction = await _modelRunner.PredictAsync(vector, cancellationToken);
-        if (prediction.SegmentPredictions.Count != route.Segments.Count)
+        if (prediction.ModelSegmentTimes.Count != route.Segments.Count)
         {
             throw new ModelServiceUnavailableException(
-                $"The model returned {prediction.SegmentPredictions.Count} segment predictions for {route.Segments.Count} route segments.");
+                $"The model returned {prediction.ModelSegmentTimes.Count} segment predictions for {route.Segments.Count} route segments.");
         }
 
-        var segmentPredictions = prediction.SegmentPredictions
+        var segmentPredictions = prediction.ModelSegmentTimes
             .Select(value => value ?? throw new ModelServiceUnavailableException(
                 "The model returned a missing segment prediction."))
             .ToArray();
@@ -50,16 +50,16 @@ public sealed class ModelService
         {
             Segments = route.Segments.Select((segment, index) => segment with
             {
-                PredictedDurationSeconds = segmentPredictions[index]
+                ModelSegmentTimeSeconds = segmentPredictions[index]
             }).ToArray()
         };
 
         return new RouteResponse
         {
-            EstimatedTravelTimeSeconds = segmentPredictions.Sum(),
-            ProviderEstimatedTravelTimeSeconds = route.ProviderEstimatedTravelTimeSeconds,
-            ProviderName = route.SelectedProvider,
-            DistanceMeters = route.DistanceMeters ?? 0,
+            ModelRouteTimeSeconds = segmentPredictions.Sum(),
+            ProviderRouteTimeSeconds = route.ProviderRouteTimeSeconds,
+            RouteProvider = route.SelectedProvider,
+            RouteDistanceM = route.DistanceMeters ?? 0,
             ModelName = vector.ModelName,
             Route = route,
             Features = new Dictionary<string, object>
@@ -76,6 +76,17 @@ public sealed class ModelService
         };
     }
 
+    /// <summary>Runs only the configured model for an explicit segment route.</summary>
+    public Task<RouteResponse> EstimateSegmentsAsync(
+        RouteRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Segments.Count == 0)
+            throw new ArgumentException("At least one segment is required for model-only estimation.");
+
+        return EstimateAsync(request, cancellationToken);
+    }
+
     private static UnifiedRoute CreateRouteFromSegments(RouteRequest request)
     {
         var segments = request.Segments.Select((segment, index) => new RouteSegment
@@ -88,6 +99,8 @@ public sealed class ModelService
             IsRoundabout = segment.IsRoundabout,
             HasTrafficSignal = segment.HasTrafficSignal,
             IsIntersection = segment.IsIntersection,
+            IsBridge = segment.IsBridge,
+            IsTunnel = segment.IsTunnel,
             MissingData = MissingFields(segment)
         }).ToArray();
 
@@ -99,7 +112,7 @@ public sealed class ModelService
             DepartureTime = request.DepartureTime,
             Mode = request.Mode,
             DistanceMeters = segments.Sum(segment => segment.LengthMeters ?? 0),
-            ProviderEstimatedTravelTimeSeconds = null,
+            ProviderRouteTimeSeconds = null,
             Segments = segments,
             MissingData = segments
                 .SelectMany(segment => segment.MissingData)
@@ -116,6 +129,8 @@ public sealed class ModelService
         if (!segment.IsRoundabout.HasValue) missing.Add("isRoundabout");
         if (!segment.HasTrafficSignal.HasValue) missing.Add("hasTrafficSignal");
         if (!segment.IsIntersection.HasValue) missing.Add("isIntersection");
+        if (!segment.IsBridge.HasValue) missing.Add("isBridge");
+        if (!segment.IsTunnel.HasValue) missing.Add("isTunnel");
         return missing;
     }
 }

@@ -8,15 +8,18 @@ public sealed record RouteSegment
     public IReadOnlyList<RoutePoint> Geometry { get; init; } = [];
     public IReadOnlyList<long> NodeIds { get; init; } = [];
     public double? LengthMeters { get; init; }
-    public double? ProviderEstimatedDurationSeconds { get; init; }
+    public double? ProviderSegmentTimeSeconds { get; init; }
+    public long? OsmWayId { get; init; }
     public string? RoadType { get; init; }
     public double? SpeedLimitKmh { get; init; }
     public int? LaneCount { get; init; }
     public bool? IsRoundabout { get; init; }
     public bool? HasTrafficSignal { get; init; }
     public bool? IsIntersection { get; init; }
+    public bool? IsBridge { get; init; }
+    public bool? IsTunnel { get; init; }
     public IReadOnlyCollection<string> MissingData { get; init; } = [];
-    public double? PredictedDurationSeconds { get; init; }
+    public double? ModelSegmentTimeSeconds { get; init; }
 }
 
 /// <summary>One provider's observations about a route.</summary>
@@ -24,7 +27,7 @@ public sealed record RouteProviderData
 {
     public required string Provider { get; init; }
     public double? DistanceMeters { get; init; }
-    public double? ProviderEstimatedDurationSeconds { get; init; }
+    public double? ProviderRouteTimeSeconds { get; init; }
     public string? RoadType { get; init; }
     public double? SpeedLimitKmh { get; init; }
     public int? TrafficSignalCount { get; init; }
@@ -52,7 +55,7 @@ public sealed record UnifiedRoute
     public string? RoadType { get; init; }
     public double? SpeedLimitKmh { get; init; }
     public int? TrafficSignalCount { get; init; }
-    public double? ProviderEstimatedTravelTimeSeconds { get; init; }
+    public double? ProviderRouteTimeSeconds { get; init; }
     public string? SelectedProvider { get; init; }
     public IReadOnlyCollection<string> MissingData { get; init; } = [];
     public IReadOnlyList<RouteProviderData> ProviderData { get; init; } = [];

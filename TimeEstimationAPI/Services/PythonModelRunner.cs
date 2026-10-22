@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using TimeEstimationAPI.Models;
 
@@ -18,8 +19,8 @@ public sealed class PythonModelRunner(
     {
         var response = await SendAsync(featureVector, cancellationToken);
         return new ModelPrediction(
-            response.EstimatedTravelTimeSeconds,
-            response.SegmentPredictions);
+            response.ModelRouteTimeSeconds,
+            response.ModelSegmentTimes);
     }
 
     private async Task<PythonPredictionResponse> SendAsync(
@@ -96,8 +97,10 @@ public sealed class PythonModelRunner(
         IReadOnlyDictionary<string, object?> TimeFeatures);
 
     private sealed record PythonPredictionResponse(
-        double EstimatedTravelTimeSeconds,
-        IReadOnlyList<double?> SegmentPredictions);
+        [property: JsonPropertyName("estimated_travel_time_seconds")]
+        double ModelRouteTimeSeconds,
+        [property: JsonPropertyName("segment_predictions")]
+        IReadOnlyList<double?> ModelSegmentTimes);
 }
 
 public sealed class ModelServiceUnavailableException(string message, Exception? innerException = null)

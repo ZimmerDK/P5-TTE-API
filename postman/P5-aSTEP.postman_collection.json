@@ -1,6 +1,5 @@
 {
   "info": {
-    "_postman_id": "p5-astep-local",
     "name": "P5 aSTEP",
     "description": "Local requests for the P5 aSTEP route estimation API and Python joblib model service.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -106,7 +105,7 @@
                   "language": "json"
                 }
               },
-              "raw": "{\n  \"modelName\": \"route_time_model_v1\",\n  \"segmentFeatures\": [\n    {\n      \"matched_length_m\": 1000,\n      \"hour\": 8,\n      \"minute\": 30,\n      \"day_of_week\": 2,\n      \"month\": 10,\n      \"speed_limit_kmh\": 50,\n      \"density\": 0,\n      \"lane_count\": 2,\n      \"bridge\": 0,\n      \"tunnel\": 0,\n      \"roundabout\": 0,\n      \"internal_intersection\": 1\n    }\n  ],\n  \"routeFeatures\": {},\n  \"timeFeatures\": {}\n}"
+              "raw": "{\n  \"modelName\": \"route_time_model_v1\",\n  \"segmentFeatures\": [\n    {\n      \"matched_length_m\": 67,\n      \"hour\": 8,\n      \"minute\": 30,\n      \"day_of_week\": 3,\n      \"month\": 10,\n      \"speed_limit_kmh\": 50,\n      \"density\": 0,\n      \"lane_count\": 2,\n      \"bridge\": 0,\n      \"tunnel\": 0,\n      \"roundabout\": 0,\n      \"internal_intersection\": 1\n    },\n    {\n      \"matched_length_m\": 42,\n      \"hour\": 8,\n      \"minute\": 31,\n      \"day_of_week\": 3,\n      \"month\": 10,\n      \"speed_limit_kmh\": 110,\n      \"density\": 0,\n      \"lane_count\": 3,\n      \"bridge\": 1,\n      \"tunnel\": 0,\n      \"roundabout\": 0,\n      \"internal_intersection\": 0\n    },\n    {\n      \"matched_length_m\": 150,\n      \"hour\": 8,\n      \"minute\": 32,\n      \"day_of_week\": 3,\n      \"month\": 10,\n      \"speed_limit_kmh\": 80,\n      \"density\": 0,\n      \"lane_count\": 2,\n      \"bridge\": 0,\n      \"tunnel\": 0,\n      \"roundabout\": 1,\n      \"internal_intersection\": 0\n    }\n  ],\n  \"routeFeatures\": {},\n  \"timeFeatures\": {}\n}"
             },
             "url": {
               "raw": "{{pythonBaseUrl}}/predict",
@@ -137,6 +136,7 @@
                   "",
                   "pm.test(\"Returns segment predictions\", function () {",
                   "    pm.expect(body.segment_predictions).to.be.an(\"array\");",
+                  "    pm.expect(body.segment_predictions.length).to.eql(3);",
                   "});"
                 ]
               }
@@ -146,7 +146,7 @@
       ]
     },
     {
-      "name": "ASP.NET API",
+      "name": "Route API",
       "item": [
         {
           "name": "Health",
@@ -182,7 +182,7 @@
           ]
         },
         {
-          "name": "Estimate Route with Explicit Segments",
+          "name": "Estimate Route with Provider and Model",
           "request": {
             "method": "POST",
             "header": [
@@ -198,7 +198,7 @@
                   "language": "json"
                 }
               },
-              "raw": "{\n  \"segments\": [\n    {\n      \"lengthMeters\": 1000,\n      \"speedLimitKmh\": 50,\n      \"laneCount\": 2,\n      \"isRoundabout\": false,\n      \"hasTrafficSignal\": false,\n      \"isIntersection\": true,\n      \"nodeIds\": [1001, 1002]\n    }\n  ],\n  \"departureTime\": \"2026-10-20T08:30:00+02:00\",\n  \"mode\": \"car\"\n}"
+              "raw": "{\n  \"source\": \"Stockholm\",\n  \"destination\": \"Gothenburg\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-22T08:30:00+02:00\",\n  \"mode\": \"car\"\n}"
             },
             "url": {
               "raw": "{{apiBaseUrl}}/api/routes/estimate",
@@ -225,8 +225,8 @@
                   "});",
                   "",
                   "pm.test(\"Returns a positive estimate in seconds\", function () {",
-                  "    pm.expect(body.estimatedTravelTimeSeconds).to.be.a(\"number\");",
-                  "    pm.expect(body.estimatedTravelTimeSeconds).to.be.above(0);",
+                  "    pm.expect(body.modelRouteTimeSeconds).to.be.a(\"number\");",
+                  "    pm.expect(body.modelRouteTimeSeconds).to.be.above(0);",
                   "});",
                   "",
                   "pm.test(\"Returns the route and segments\", function () {",
@@ -236,7 +236,114 @@
                   "",
                   "pm.test(\"Returns model diagnostics\", function () {",
                   "    pm.expect(body.features).to.be.an(\"object\");",
-                  "    pm.expect(body.features.segmentCount).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Provider Route Data and OSM Enrichment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"source\": \"Stockholm\",\n  \"destination\": \"Gothenburg\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-22T08:30:00+02:00\",\n  \"mode\": \"car\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/api/routes/provider-data",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "routes",
+                "provider-data"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Returns provider route data\", function () {",
+                  "    pm.expect(body.selectedProvider).to.be.a(\"string\");",
+                  "    pm.expect(body.segments).to.be.an(\"array\");",
+                  "    pm.expect(body.providerData).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Model-only Estimate from Explicit Segments",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"segments\": [\n    {\n      \"lengthMeters\": 67,\n      \"roadType\": \"residential\",\n      \"speedLimitKmh\": 50,\n      \"laneCount\": 2,\n      \"isRoundabout\": false,\n      \"hasTrafficSignal\": true,\n      \"isIntersection\": true,\n      \"isBridge\": false,\n      \"isTunnel\": false\n    },\n    {\n      \"lengthMeters\": 42,\n      \"roadType\": \"motorway\",\n      \"speedLimitKmh\": 110,\n      \"laneCount\": 3,\n      \"isRoundabout\": false,\n      \"hasTrafficSignal\": false,\n      \"isIntersection\": false,\n      \"isBridge\": true,\n      \"isTunnel\": false\n    },\n    {\n      \"lengthMeters\": 150,\n      \"roadType\": \"primary\",\n      \"speedLimitKmh\": 80,\n      \"laneCount\": 2,\n      \"isRoundabout\": true,\n      \"hasTrafficSignal\": false,\n      \"isIntersection\": false,\n      \"isBridge\": false,\n      \"isTunnel\": false\n    }\n  ],\n  \"departureTime\": \"2026-10-22T08:30:00+02:00\",\n  \"mode\": \"car\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/api/routes/model-only",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "routes",
+                "model-only"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Returns model route and segment estimates\", function () {",
+                  "    pm.expect(body.modelRouteTimeSeconds).to.be.a(\"number\");",
+                  "    pm.expect(body.modelRouteTimeSeconds).to.be.above(0);",
+                  "    pm.expect(body.route.segments).to.be.an(\"array\");",
+                  "    pm.expect(body.route.segments.length).to.eql(3);",
+                  "    pm.expect(body.route.segments[0].modelSegmentTimeSeconds).to.be.a(\"number\");",
                   "});"
                 ]
               }

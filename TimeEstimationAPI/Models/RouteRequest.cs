@@ -39,4 +39,6 @@ public sealed record RouteSegmentInput
     public bool? HasTrafficSignal { get; init; }
     /// <summary>Whether this segment represents an intersection.</summary>
     public bool? IsIntersection { get; init; }
+    public bool? IsBridge { get; init; }
+    public bool? IsTunnel { get; init; }
 }

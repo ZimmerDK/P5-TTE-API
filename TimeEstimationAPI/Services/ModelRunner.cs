@@ -11,12 +11,11 @@ public sealed class RouteModelOptions
     public string PythonServiceUrl { get; set; } = "http://localhost:8001";
     public int PythonServiceTimeoutSeconds { get; set; } = 30;
     public double PlaceholderAverageSpeedKmh { get; set; } = 40;
-    public double MaxMatchedLengthMeters { get; set; } = 67;
 }
 
 public sealed record ModelPrediction(
-    double EstimatedTravelTimeSeconds,
-    IReadOnlyList<double?> SegmentPredictions);
+    double ModelRouteTimeSeconds,
+    IReadOnlyList<double?> ModelSegmentTimes);
 
 public interface ITravelTimeModelRunner
 {

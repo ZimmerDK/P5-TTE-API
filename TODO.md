@@ -23,6 +23,18 @@ before changing routing, feature engineering, or model integration.
 - [ ] Capture a real Valhalla response and update the adapter/tests from the
       actual response shape.
 
+## Improve OSM enrichment
+
+- [x] Query OSM way geometry through Overpass and split large route areas into
+      smaller bounded requests.
+- [x] Match the full OSRM step geometry rather than only its midpoint.
+- [x] Preserve provider bridge/tunnel signals when two roads overlap in 2D.
+- [x] Expose the matched Overpass `osmWayId` for segment diagnostics.
+- [ ] Add mocked OSRM/Overpass tests for parallel urban roads, ramps, and
+      bridge/underpass cases.
+- [ ] Use a provider-supported way identifier or a full map-matching engine if
+      authoritative road identity is required.
+
 ## Align model features
 
 - [x] Implement segment-level prediction: one model row and one prediction per
