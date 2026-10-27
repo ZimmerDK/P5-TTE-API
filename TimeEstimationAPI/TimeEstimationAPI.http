@@ -72,7 +72,43 @@ Content-Type: application/json
 ### API Health Check
 GET {{apiBaseUrl}}/health
 
-### Estimate Route with Provider and Model
+### Estimate Route (Short Local Route: Aalborg Station to Utzon Center ~10-15 segments)
+POST {{apiBaseUrl}}/api/routes/estimate
+Content-Type: application/json
+
+{
+  "source": "Aalborg Station, Denmark",
+  "destination": "Utzon Center, Aalborg, Denmark",
+  "via": [],
+  "departureTime": "2026-10-22T08:30:00+02:00",
+  "mode": "car"
+}
+
+### Estimate Route (Urban Short Route: Aalborg Station to Aalborg University)
+POST {{apiBaseUrl}}/api/routes/estimate
+Content-Type: application/json
+
+{
+  "source": "Aalborg Station, Denmark",
+  "destination": "Aalborg Universitet, Denmark",
+  "via": [],
+  "departureTime": "2026-10-22T08:30:00+02:00",
+  "mode": "car"
+}
+
+### Estimate Route (Urban Short Route: Copenhagen Central to Nyhavn)
+POST {{apiBaseUrl}}/api/routes/estimate
+Content-Type: application/json
+
+{
+  "source": "København H, Copenhagen",
+  "destination": "Nyhavn, Copenhagen",
+  "via": [],
+  "departureTime": "2026-10-22T08:30:00+02:00",
+  "mode": "car"
+}
+
+### Estimate Route with Provider and Model (Intercity: Stockholm to Gothenburg)
 POST {{apiBaseUrl}}/api/routes/estimate
 Content-Type: application/json
 

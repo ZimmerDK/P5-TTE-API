@@ -1,6 +1,7 @@
 param(
     [string]$ModelPath = "",
-    [switch]$UseOsrm
+    [switch]$UseOsrm,
+    [switch]$UseOverpass
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,6 +71,11 @@ $env:Model__PythonServiceUrl = "http://127.0.0.1:8001"
 if ($UseOsrm) {
     $env:Osm__UseOsrm = "true"
 }
+if ($UseOverpass) {
+    $env:Osm__UseOverpass = "true"
+} else {
+    $env:Osm__UseOverpass = "false"
+}
 
 $pythonProcess = Start-Process `
     -FilePath $pythonExecutable `
@@ -87,6 +93,11 @@ Write-Host "Python model service started with PID $($pythonProcess.Id) at http:/
 Write-Host "ASP.NET API started with PID $($apiProcess.Id) at http://localhost:5073"
 if ($UseOsrm) {
     Write-Host "OSRM/Nominatim routing is enabled."
+}
+if ($UseOverpass) {
+    Write-Host "Overpass OSM tag enrichment is enabled."
+} else {
+    Write-Host "Overpass OSM tag enrichment is disabled (using fallback tags)."
 }
 Write-Host "Current model info:"
 Write-Host "  http://127.0.0.1:8001/model-info"

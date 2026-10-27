@@ -1,0 +1,16 @@
+# Python virtual environments & compiled files
+ml-service/
+ml-service/app.py
+.venv/
+__pycache__/
+*.pyc
+
+# C# / .NET build outputs
+bin/
+obj/
+.vs/
+
+# Git & Postman files
+.git/
+postman/
+*.json

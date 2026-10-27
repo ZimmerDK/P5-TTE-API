@@ -1,5 +1,7 @@
 namespace TimeEstimationAPI.Models;
 
+using System.Text.Json.Serialization;
+
 public sealed record RoutePoint(double Longitude, double Latitude);
 
 public sealed record RouteSegment
@@ -33,7 +35,11 @@ public sealed record RouteProviderData
     public int? TrafficSignalCount { get; init; }
     public bool IsAvailable { get; init; }
     public IReadOnlyCollection<string> MissingFields { get; init; } = [];
+
+    [JsonIgnore]
     public IReadOnlyList<RoutePoint> Geometry { get; init; } = [];
+
+    [JsonIgnore]
     public IReadOnlyList<RouteSegment> Segments { get; init; } = [];
 }
 
@@ -47,7 +53,10 @@ public sealed record UnifiedRoute
     public required string Source { get; init; }
     public required string Destination { get; init; }
     public IReadOnlyList<string> Via { get; init; } = [];
+
+    [JsonIgnore]
     public IReadOnlyList<RoutePoint> Geometry { get; init; } = [];
+
     public IReadOnlyList<RouteSegment> Segments { get; init; } = [];
     public DateTimeOffset DepartureTime { get; init; }
     public required string Mode { get; init; }

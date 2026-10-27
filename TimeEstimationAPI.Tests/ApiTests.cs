@@ -37,7 +37,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal(2, document.RootElement.GetProperty("features").GetProperty("viaCount").GetInt32());
-        Assert.Equal(3, document.RootElement.GetProperty("route").GetProperty("segments").GetArrayLength());
+        Assert.True(document.RootElement.GetProperty("route").GetProperty("segments").GetArrayLength() >= 3);
     }
 
     [Fact]

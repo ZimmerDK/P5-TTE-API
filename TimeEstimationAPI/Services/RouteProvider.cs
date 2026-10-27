@@ -36,9 +36,11 @@ public sealed class ProviderRouteResult
 public sealed class OsmOptions
 {
     public bool UseOsrm { get; set; }
+    public bool UseOverpass { get; set; }
     public string GeocodingUrl { get; set; } = "https://nominatim.openstreetmap.org/search";
     public string RoutingUrl { get; set; } = "https://router.project-osrm.org/route/v1/driving";
-    public string OverpassUrl { get; set; } = "https://overpass-api.de/api/interpreter";
+    public string OverpassUrl { get; set; } = "https://overpass.kumi.systems/api/interpreter";
+    public string FallbackOverpassUrl { get; set; } = "https://overpass-api.de/api/interpreter";
 }
 
 /// <summary>Geocode stops, asks OSRM for route steps, then maps them to segments.</summary>
@@ -150,16 +152,40 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
             .ToArray();
     }
 
+    /// <summary>
+    /// Parses step coordinates from OSRM JSON. First checks for explicit step geometry polylines.
+    /// If absent, falls back to extracting geographic coordinates from step intersections
+    /// so every route segment has valid spatial geometry for bounding box calculations and Overpass matching.
+    /// </summary>
     private static IReadOnlyList<RoutePoint> ParseStepGeometry(JsonElement step)
     {
-        if (!step.TryGetProperty("geometry", out var geometry) ||
-            !geometry.TryGetProperty("coordinates", out var coordinates))
-            return [];
+        // 1. Primary approach: Check if OSRM returned explicit step geometry coordinates array [[lon, lat], ...]
+        if (step.TryGetProperty("geometry", out var geometry) &&
+            geometry.TryGetProperty("coordinates", out var coordinates))
+        {
+            var points = coordinates.EnumerateArray()
+                .Where(point => point.GetArrayLength() >= 2)
+                .Select(point => new RoutePoint(point[0].GetDouble(), point[1].GetDouble()))
+                .ToArray();
+            if (points.Length > 0)
+                return points;
+        }
 
-        return coordinates.EnumerateArray()
-            .Where(point => point.GetArrayLength() >= 2)
-            .Select(point => new RoutePoint(point[0].GetDouble(), point[1].GetDouble()))
-            .ToArray();
+        // 2. Fallback approach: If step.geometry is missing, extract intersection node coordinates.
+        // OSRM includes an "intersections" array for every maneuver step with "location": [longitude, latitude].
+        if (step.TryGetProperty("intersections", out var intersections))
+        {
+            return intersections.EnumerateArray()
+                .Where(intersection => intersection.TryGetProperty("location", out var loc) && loc.GetArrayLength() >= 2)
+                .Select(intersection =>
+                {
+                    var loc = intersection.GetProperty("location");
+                    return new RoutePoint(loc[0].GetDouble(), loc[1].GetDouble());
+                })
+                .ToArray();
+        }
+
+        return [];
     }
 
     private static double? GetDouble(JsonElement element, string property) =>

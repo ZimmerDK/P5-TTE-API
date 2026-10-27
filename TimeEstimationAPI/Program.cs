@@ -1,4 +1,4 @@
-using TimeEstimationAPI.Models;
+﻿using TimeEstimationAPI.Models;
 using TimeEstimationAPI.Services;
 using TimeEstimationAPI.Middleware;
 using System.Diagnostics;
@@ -19,17 +19,21 @@ builder.Services.AddHttpClient<OsrmService>(client =>
     client.Timeout = TimeSpan.FromSeconds(15);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0 (development)");
 });
+
 builder.Services.AddHttpClient<ValhallaService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
 });
+
 builder.Services.AddHttpClient<OsmTagEnricher>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0 (development)");
 });
+
 builder.Services.AddHttpClient<PythonModelRunner>();
+
 // Keep the rest of the app independent from the actual route-data source.
 // Development uses stable local data; setting Osm:UseOsrm switches to live calls.
 builder.Services.AddSingleton<IEnumerable<IRouteProvider>>(serviceProvider =>
@@ -94,7 +98,7 @@ app.MapPost("/api/routes/estimate", async (RouteRequest request, ModelService mo
     var startedAt = Stopwatch.GetTimestamp();
     var result = await modelService.EstimateAsync(request, cancellationToken);
     logger.LogInformation("Estimated route with {SegmentCount} segments in {ElapsedMilliseconds} ms.",
-        request.Segments.Count, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+        result.Route?.Segments.Count ?? request.Segments.Count, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
     return Results.Ok(result);
 })
 .WithName("EstimateRoute")

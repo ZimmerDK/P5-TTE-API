@@ -29,28 +29,128 @@ public sealed class OsmTagEnricher(
         if (segments.Count == 0)
             return segments;
 
+        if (!_options.UseOverpass)
+        {
+            logger.LogInformation("Overpass OSM tag enrichment is disabled. Applying fallback tags.");
+            return ApplyFallbackTags(segments);
+        }
+
         var points = segments.SelectMany(segment => segment.Geometry).ToArray();
         if (points.Length == 0)
-            return segments;
+            return ApplyFallbackTags(segments);
 
         var south = points.Min(point => point.Latitude);
         var north = points.Max(point => point.Latitude);
         var west = points.Min(point => point.Longitude);
         var east = points.Max(point => point.Longitude);
         var ways = new List<OsmWay>();
-        foreach (var box in CreateBoundingBoxes(south, west, north, east))
+        // Cap bounding box queries to a maximum of 5 to avoid rate-limiting/timeouts on long routes.
+        foreach (var box in CreateBoundingBoxes(south, west, north, east).Take(5))
         {
+            if (cancellationToken.IsCancellationRequested)
+                break;
+
             var boxWays = await FetchWaysAsync(box, cancellationToken);
             if (boxWays is not null)
+            {
                 ways.AddRange(boxWays);
+            }
+            else
+            {
+                // Stop attempting remaining bounding boxes if Overpass endpoints failed or timed out.
+                break;
+            }
         }
 
         if (ways.Count == 0)
         {
-            return segments;
+            return ApplyFallbackTags(segments);
         }
 
-        return segments.Select(segment => EnrichSegment(segment, ways)).ToArray();
+        var enriched = segments.Select(segment => EnrichSegment(segment, ways)).ToArray();
+        return ApplyFallbackTags(enriched);
+    }
+
+    /// <summary>
+    /// Evaluates route segments against missing attributes and applies dynamic fallback logic.<br/>
+    /// 1. Speed limit: If missing, calculates implied travel speed from OSRM distance and duration ((length / time) * 3.6),
+    ///    then snaps to standard legal speed limits (30, 40, 50, 70, 80, 90, 110, 130 km/h).<br/>
+    /// 2. Road type: If missing, infers classification from speed limit (>= 90 motorway, >= 70 primary, else secondary).<br/>
+    /// 3. Lane count: Defaults to 2 if unpopulated.
+    /// </summary>
+    private static IReadOnlyList<RouteSegment> ApplyFallbackTags(IReadOnlyList<RouteSegment> segments)
+    {
+        return segments.Select(segment =>
+        {
+            // 1. Calculate or preserve speed limit
+            var speedLimit = (segment.SpeedLimitKmh.HasValue && segment.SpeedLimitKmh.Value > 0)
+                ? segment.SpeedLimitKmh.Value
+                : (segment.LengthMeters > 0 && segment.ProviderSegmentTimeSeconds > 0)
+                    // Compute implied speed (m/s -> km/h) from OSRM step length/duration, then snap to legal speed limit
+                    ? SnapToStandardSpeedLimit((segment.LengthMeters.Value / segment.ProviderSegmentTimeSeconds.Value) * 3.6, segment.RoadType)
+                    : 50.0; // Fall back to baseline urban speed if metrics are unavailable
+
+            // 2. Infer or preserve road type
+            var roadType = !string.IsNullOrWhiteSpace(segment.RoadType)
+                ? segment.RoadType
+                : speedLimit switch
+                {
+                    >= 90 => "motorway",
+                    >= 70 => "primary",
+                    _ => "secondary"
+                };
+
+            // 3. Set or preserve lane count
+            var laneCount = (segment.LaneCount.HasValue && segment.LaneCount.Value > 0)
+                ? segment.LaneCount.Value
+                : 2;
+
+            // Remove populated fields from missingData array
+            var missing = segment.MissingData
+                .Where(field => field switch
+                {
+                    "roadType" => false,
+                    "speedLimitKmh" => false,
+                    "laneCount" => false,
+                    _ => true
+                })
+                .ToArray();
+
+            return segment with
+            {
+                RoadType = roadType,
+                SpeedLimitKmh = speedLimit,
+                LaneCount = laneCount,
+                MissingData = missing
+            };
+        }).ToArray();
+    }
+
+    private static double SnapToStandardSpeedLimit(double calculatedSpeedKmh, string? roadType)
+    {
+        static double Snap(double speed) => speed switch
+        {
+            <= 35 => 30.0,
+            <= 45 => 40.0,
+            <= 60 => 50.0,
+            <= 75 => 70.0,
+            <= 85 => 80.0,
+            <= 95 => 90.0,
+            <= 120 => 110.0,
+            _ => 130.0
+        };
+
+        var baseLimit = roadType switch
+        {
+            "motorway" or "motorway_link" => 110.0,
+            "primary" or "primary_link" or "trunk" or "trunk_link" => 80.0,
+            "secondary" or "secondary_link" or "tertiary" or "tertiary_link" => 50.0,
+            "residential" or "living_street" => 30.0,
+            _ => 50.0
+        };
+
+        var snapped = Snap(calculatedSpeedKmh);
+        return Math.Max(snapped, baseLimit);
     }
 
     private async Task<IReadOnlyList<OsmWay>?> FetchWaysAsync(
@@ -58,8 +158,8 @@ public sealed class OsmTagEnricher(
         CancellationToken cancellationToken)
     {
         var query = $"""
-            [out:json][timeout:20];
-            way[highway](
+            [out:json][timeout:15];
+            way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"](
               {box.South.ToString(CultureInfo.InvariantCulture)},
               {box.West.ToString(CultureInfo.InvariantCulture)},
               {box.North.ToString(CultureInfo.InvariantCulture)},
@@ -67,31 +167,47 @@ public sealed class OsmTagEnricher(
             );
             out geom tags;
             """;
-        var url = $"{_options.OverpassUrl}?data={Uri.EscapeDataString(query)}";
 
-        try
+        var endpoints = new[]
         {
-            using var response = await httpClient.GetAsync(url, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            using var document = await response.Content.ReadFromJsonAsync<JsonDocument>(
-                cancellationToken: cancellationToken);
-            return document?.RootElement.GetProperty("elements")
-                .EnumerateArray()
-                .Select(ParseWay)
-                .Where(way => way is not null)
-                .Select(way => way!)
-                .ToArray() ?? [];
+            _options.OverpassUrl,
+            _options.FallbackOverpassUrl,
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://overpass-api.de/api/interpreter"
         }
-        catch (HttpRequestException exception)
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Distinct();
+
+        foreach (var endpoint in endpoints)
         {
-            logger.LogWarning(exception, "OSM tag enrichment was unavailable for one query area.");
-            return null;
+            try
+            {
+                using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                attemptCts.CancelAfter(TimeSpan.FromSeconds(8));
+
+                using var content = new FormUrlEncodedContent([new KeyValuePair<string, string>("data", query)]);
+                using var response = await httpClient.PostAsync(endpoint, content, attemptCts.Token);
+                response.EnsureSuccessStatusCode();
+                using var document = await response.Content.ReadFromJsonAsync<JsonDocument>(
+                    cancellationToken: attemptCts.Token);
+                return document?.RootElement.GetProperty("elements")
+                    .EnumerateArray()
+                    .Select(ParseWay)
+                    .Where(way => way is not null)
+                    .Select(way => way!)
+                    .ToArray() ?? [];
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "OSM tag enrichment failed for query area using endpoint {Endpoint}.", endpoint);
+            }
         }
-        catch (JsonException exception)
-        {
-            logger.LogWarning(exception, "OSM tag enrichment returned invalid data for one query area.");
-            return null;
-        }
+
+        return null;
     }
 
     private static RouteSegment EnrichSegment(RouteSegment segment, IReadOnlyList<OsmWay> ways)
