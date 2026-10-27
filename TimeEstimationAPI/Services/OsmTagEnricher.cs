@@ -183,7 +183,7 @@ public sealed class OsmTagEnricher(
             try
             {
                 using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                attemptCts.CancelAfter(TimeSpan.FromSeconds(8));
+                attemptCts.CancelAfter(TimeSpan.FromSeconds(4));
 
                 using var content = new FormUrlEncodedContent([new KeyValuePair<string, string>("data", query)]);
                 using var response = await httpClient.PostAsync(endpoint, content, attemptCts.Token);

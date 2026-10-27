@@ -28,7 +28,6 @@ public sealed class ProviderRouteResult
     public int? TrafficSignalCount { get; set; }
     public bool IsAvailable { get; set; } = true;
     public IReadOnlyCollection<string> MissingFields { get; set; } = [];
-    public IReadOnlyList<RoutePoint> Geometry { get; set; } = [];
     public IReadOnlyList<RouteSegment> Segments { get; set; } = [];
 }
 
@@ -81,7 +80,6 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
             ProviderRouteTimeSeconds = ParseDuration(route.GetProperty("duration")),
             TrafficSignalCount = CountTrafficSignals(segments),
             MissingFields = ["roadType", "speedLimitKmh", "laneCount"],
-            Geometry = ParseGeometry(route),
             Segments = segments
         };
     }
@@ -139,18 +137,6 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
 
     private static int CountTrafficSignals(IEnumerable<RouteSegment> segments) =>
         segments.Count(segment => segment.HasTrafficSignal == true);
-
-    private static IReadOnlyList<RoutePoint> ParseGeometry(JsonElement route)
-    {
-        if (!route.TryGetProperty("geometry", out var geometry) ||
-            !geometry.TryGetProperty("coordinates", out var coordinates))
-            return [];
-
-        return coordinates.EnumerateArray()
-            .Where(point => point.GetArrayLength() >= 2)
-            .Select(point => new RoutePoint(point[0].GetDouble(), point[1].GetDouble()))
-            .ToArray();
-    }
 
     /// <summary>
     /// Parses step coordinates from OSRM JSON. First checks for explicit step geometry polylines.

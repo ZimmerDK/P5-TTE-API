@@ -22,7 +22,7 @@ Content-Type: application/json
       "matched_length_m": 67,
       "hour": 8,
       "minute": 30,
-      "day_of_week": 3,
+      "day_of_week": 2,
       "month": 10,
       "speed_limit_kmh": 50,
       "density": 0,
@@ -36,7 +36,7 @@ Content-Type: application/json
       "matched_length_m": 42,
       "hour": 8,
       "minute": 31,
-      "day_of_week": 3,
+      "day_of_week": 2,
       "month": 10,
       "speed_limit_kmh": 110,
       "density": 0,
@@ -50,7 +50,7 @@ Content-Type: application/json
       "matched_length_m": 150,
       "hour": 8,
       "minute": 32,
-      "day_of_week": 3,
+      "day_of_week": 2,
       "month": 10,
       "speed_limit_kmh": 80,
       "density": 0,
@@ -78,9 +78,9 @@ Content-Type: application/json
 
 {
   "source": "Aalborg Station, Denmark",
-  "destination": "Utzon Center, Aalborg, Denmark",
+  "destination": "Karolinelundsvej 45, 9000 Aalborg, Denmark",
   "via": [],
-  "departureTime": "2026-10-22T08:30:00+02:00",
+  "departureTime": "2026-10-27T08:30:00+01:00",
   "mode": "car"
 }
 
@@ -92,7 +92,7 @@ Content-Type: application/json
   "source": "Aalborg Station, Denmark",
   "destination": "Aalborg Universitet, Denmark",
   "via": [],
-  "departureTime": "2026-10-22T08:30:00+02:00",
+  "departureTime": "2026-10-27T08:30:00+01:00",
   "mode": "car"
 }
 
@@ -104,7 +104,7 @@ Content-Type: application/json
   "source": "København H, Copenhagen",
   "destination": "Nyhavn, Copenhagen",
   "via": [],
-  "departureTime": "2026-10-22T08:30:00+02:00",
+  "departureTime": "2026-10-27T08:30:00+01:00",
   "mode": "car"
 }
 
@@ -116,7 +116,7 @@ Content-Type: application/json
   "source": "Stockholm",
   "destination": "Gothenburg",
   "via": [],
-  "departureTime": "2026-10-22T08:30:00+02:00",
+  "departureTime": "2026-10-27T08:30:00+01:00",
   "mode": "car"
 }
 
@@ -128,7 +128,7 @@ Content-Type: application/json
   "source": "Stockholm",
   "destination": "Gothenburg",
   "via": [],
-  "departureTime": "2026-10-22T08:30:00+02:00",
+  "departureTime": "2026-10-27T08:30:00+01:00",
   "mode": "car"
 }
 
@@ -172,7 +172,7 @@ Content-Type: application/json
       "isTunnel": false
     }
   ],
-  "departureTime": "2026-10-22T08:30:00+02:00",
+  "departureTime": "2026-10-27T08:30:00+01:00",
   "mode": "car"
 }
 
@@ -184,6 +184,6 @@ Content-Type: application/json
   "source": "",
   "destination": "",
   "via": [],
-  "departureTime": "2026-09-24T08:30:00Z",
+  "departureTime": "2026-10-27T08:30:00+01:00",
   "mode": "car"
 }

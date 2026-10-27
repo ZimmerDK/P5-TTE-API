@@ -70,7 +70,6 @@ public sealed class RouteDataCollector(
             TrafficSignalCount = primary.TrafficSignalCount,
             ProviderRouteTimeSeconds = primary.ProviderRouteTimeSeconds,
             SelectedProvider = primary.Provider,
-            Geometry = primary.Geometry,
             Segments = primary.Segments,
             MissingData = missingData,
             ProviderData = providerData
@@ -89,7 +88,6 @@ public sealed class RouteDataCollector(
             TrafficSignalCount = data.TrafficSignalCount,
             IsAvailable = data.IsAvailable,
             MissingFields = data.MissingFields,
-            Geometry = data.Geometry,
             Segments = data.Segments
         };
     }

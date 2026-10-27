@@ -28,7 +28,7 @@ builder.Services.AddHttpClient<ValhallaService>(client =>
 
 builder.Services.AddHttpClient<OsmTagEnricher>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(10);
+    client.Timeout = TimeSpan.FromSeconds(5);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0 (development)");
 });
 

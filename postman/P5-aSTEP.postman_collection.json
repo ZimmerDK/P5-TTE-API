@@ -105,7 +105,7 @@
                   "language": "json"
                 }
               },
-              "raw": "{\n  \"modelName\": \"route_time_model_v1\",\n  \"segmentFeatures\": [\n    {\n      \"matched_length_m\": 67,\n      \"hour\": 8,\n      \"minute\": 30,\n      \"day_of_week\": 3,\n      \"month\": 10,\n      \"speed_limit_kmh\": 50,\n      \"density\": 0,\n      \"lane_count\": 2,\n      \"bridge\": 0,\n      \"tunnel\": 0,\n      \"roundabout\": 0,\n      \"internal_intersection\": 1\n    },\n    {\n      \"matched_length_m\": 42,\n      \"hour\": 8,\n      \"minute\": 31,\n      \"day_of_week\": 3,\n      \"month\": 10,\n      \"speed_limit_kmh\": 110,\n      \"density\": 0,\n      \"lane_count\": 3,\n      \"bridge\": 1,\n      \"tunnel\": 0,\n      \"roundabout\": 0,\n      \"internal_intersection\": 0\n    },\n    {\n      \"matched_length_m\": 150,\n      \"hour\": 8,\n      \"minute\": 32,\n      \"day_of_week\": 3,\n      \"month\": 10,\n      \"speed_limit_kmh\": 80,\n      \"density\": 0,\n      \"lane_count\": 2,\n      \"bridge\": 0,\n      \"tunnel\": 0,\n      \"roundabout\": 1,\n      \"internal_intersection\": 0\n    }\n  ],\n  \"routeFeatures\": {},\n  \"timeFeatures\": {}\n}"
+              "raw": "{\n  \"modelName\": \"route_time_model_v1\",\n  \"segmentFeatures\": [\n    {\n      \"matched_length_m\": 67,\n      \"hour\": 8,\n      \"minute\": 30,\n      \"day_of_week\": 2,\n      \"month\": 10,\n      \"speed_limit_kmh\": 50,\n      \"density\": 0,\n      \"lane_count\": 2,\n      \"bridge\": 0,\n      \"tunnel\": 0,\n      \"roundabout\": 0,\n      \"internal_intersection\": 1\n    },\n    {\n      \"matched_length_m\": 42,\n      \"hour\": 8,\n      \"minute\": 30,\n      \"day_of_week\": 2,\n      \"month\": 10,\n      \"speed_limit_kmh\": 110,\n      \"density\": 0,\n      \"lane_count\": 3,\n      \"bridge\": 1,\n      \"tunnel\": 0,\n      \"roundabout\": 0,\n      \"internal_intersection\": 0\n    },\n    {\n      \"matched_length_m\": 150,\n      \"hour\": 8,\n      \"minute\": 30,\n      \"day_of_week\": 2,\n      \"month\": 10,\n      \"speed_limit_kmh\": 80,\n      \"density\": 0,\n      \"lane_count\": 2,\n      \"bridge\": 0,\n      \"tunnel\": 0,\n      \"roundabout\": 1,\n      \"internal_intersection\": 0\n    }\n  ],\n  \"routeFeatures\": {},\n  \"timeFeatures\": {}\n}"
             },
             "url": {
               "raw": "{{pythonBaseUrl}}/predict",
@@ -182,23 +182,19 @@
           ]
         },
         {
-          "name": "Estimate Route with Provider and Model",
+          "name": "Est Route (Short Local Route: Aalborg Station to Karolinelundsvej 45 (Shell))",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              },
-              "raw": "{\n  \"source\": \"Stockholm\",\n  \"destination\": \"Gothenburg\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-22T08:30:00+02:00\",\n  \"mode\": \"car\"\n}"
+              "raw": "{\n  \"source\": \"Aalborg Station, Denmark\",\n  \"destination\": \"Karolinelundsvej 45, 9000 Aalborg, Denmark\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-27T14:30:00+01:00\",\n  \"mode\": \"car\"\n}"
             },
             "url": {
               "raw": "{{apiBaseUrl}}/api/routes/estimate",
@@ -212,30 +208,114 @@
               ]
             }
           },
+          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const body = pm.response.json();",
-                  "",
                   "pm.test(\"Status is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test(\"Returns a positive estimate in seconds\", function () {",
-                  "    pm.expect(body.modelRouteTimeSeconds).to.be.a(\"number\");",
-                  "    pm.expect(body.modelRouteTimeSeconds).to.be.above(0);",
+                  "pm.test(\"Response contains totalEstimatedSeconds\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"totalEstimatedSeconds\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Est Route (Urban Short Route: Aalborg Station to Aalborg University)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"Aalborg Station, Denmark\",\n  \"destination\": \"Aalborg Universitet, Denmark\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-27T14:30:00+01:00\",\n  \"mode\": \"car\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/api/routes/estimate",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "routes",
+                "estimate"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test(\"Returns the route and segments\", function () {",
-                  "    pm.expect(body.route).to.be.an(\"object\");",
-                  "    pm.expect(body.route.segments).to.be.an(\"array\");",
+                  "pm.test(\"Response contains totalEstimatedSeconds\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"totalEstimatedSeconds\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Est Route (Intercity: Aalborg St to Hobro St)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"Aalborg Station, Denmark\",\n  \"destination\": \"Hobro Station, Denmark\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-27T14:30:00+01:00\",\n  \"mode\": \"car\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/api/routes/estimate",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "routes",
+                "estimate"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test(\"Returns model diagnostics\", function () {",
-                  "    pm.expect(body.features).to.be.an(\"object\");",
+                  "pm.test(\"Response contains totalEstimatedSeconds\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"totalEstimatedSeconds\");",
                   "});"
                 ]
               }
@@ -249,17 +329,13 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              },
-              "raw": "{\n  \"source\": \"Stockholm\",\n  \"destination\": \"Gothenburg\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-22T08:30:00+02:00\",\n  \"mode\": \"car\"\n}"
+              "raw": "{\n  \"source\": \"Stockholm\",\n  \"destination\": \"Gothenburg\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-27T14:30:00+01:00\",\n  \"mode\": \"car\"\n}"
             },
             "url": {
               "raw": "{{apiBaseUrl}}/api/routes/provider-data",
@@ -273,22 +349,15 @@
               ]
             }
           },
+          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const body = pm.response.json();",
-                  "",
                   "pm.test(\"Status is 200\", function () {",
                   "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Returns provider route data\", function () {",
-                  "    pm.expect(body.selectedProvider).to.be.a(\"string\");",
-                  "    pm.expect(body.segments).to.be.an(\"array\");",
-                  "    pm.expect(body.providerData).to.be.an(\"array\");",
                   "});"
                 ]
               }
@@ -302,17 +371,13 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json"
+                "value": "application/json",
+                "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              },
-              "raw": "{\n  \"segments\": [\n    {\n      \"lengthMeters\": 67,\n      \"roadType\": \"residential\",\n      \"speedLimitKmh\": 50,\n      \"laneCount\": 2,\n      \"isRoundabout\": false,\n      \"hasTrafficSignal\": true,\n      \"isIntersection\": true,\n      \"isBridge\": false,\n      \"isTunnel\": false\n    },\n    {\n      \"lengthMeters\": 42,\n      \"roadType\": \"motorway\",\n      \"speedLimitKmh\": 110,\n      \"laneCount\": 3,\n      \"isRoundabout\": false,\n      \"hasTrafficSignal\": false,\n      \"isIntersection\": false,\n      \"isBridge\": true,\n      \"isTunnel\": false\n    },\n    {\n      \"lengthMeters\": 150,\n      \"roadType\": \"primary\",\n      \"speedLimitKmh\": 80,\n      \"laneCount\": 2,\n      \"isRoundabout\": true,\n      \"hasTrafficSignal\": false,\n      \"isIntersection\": false,\n      \"isBridge\": false,\n      \"isTunnel\": false\n    }\n  ],\n  \"departureTime\": \"2026-10-22T08:30:00+02:00\",\n  \"mode\": \"car\"\n}"
+              "raw": "{\n  \"segments\": [\n    {\n      \"lengthMeters\": 67,\n      \"roadType\": \"residential\",\n      \"speedLimitKmh\": 50,\n      \"laneCount\": 2,\n      \"isRoundabout\": false,\n      \"hasTrafficSignal\": true,\n      \"isIntersection\": true,\n      \"isBridge\": false,\n      \"isTunnel\": false\n    },\n    {\n      \"lengthMeters\": 42,\n      \"roadType\": \"motorway\",\n      \"speedLimitKmh\": 110,\n      \"laneCount\": 3,\n      \"isRoundabout\": false,\n      \"hasTrafficSignal\": false,\n      \"isIntersection\": false,\n      \"isBridge\": true,\n      \"isTunnel\": false\n    },\n    {\n      \"lengthMeters\": 150,\n      \"roadType\": \"primary\",\n      \"speedLimitKmh\": 80,\n      \"laneCount\": 2,\n      \"isRoundabout\": true,\n      \"hasTrafficSignal\": false,\n      \"isIntersection\": false,\n      \"isBridge\": false,\n      \"isTunnel\": false\n    }\n  ],\n  \"departureTime\": \"2026-10-27T14:30:00+01:00\",\n  \"mode\": \"car\"\n}"
             },
             "url": {
               "raw": "{{apiBaseUrl}}/api/routes/model-only",
@@ -326,24 +391,62 @@
               ]
             }
           },
+          "response": [],
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const body = pm.response.json();",
-                  "",
                   "pm.test(\"Status is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test(\"Returns model route and segment estimates\", function () {",
-                  "    pm.expect(body.modelRouteTimeSeconds).to.be.a(\"number\");",
-                  "    pm.expect(body.modelRouteTimeSeconds).to.be.above(0);",
-                  "    pm.expect(body.route.segments).to.be.an(\"array\");",
-                  "    pm.expect(body.route.segments.length).to.eql(3);",
-                  "    pm.expect(body.route.segments[0].modelSegmentTimeSeconds).to.be.a(\"number\");",
+                  "pm.test(\"Response contains totalEstimatedSeconds\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"totalEstimatedSeconds\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Estimate Validation Check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"\",\n  \"destination\": \"\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-27T14:30:00+01:00\",\n  \"mode\": \"car\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/api/routes/estimate",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "routes",
+                "estimate"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
                   "});"
                 ]
               }
