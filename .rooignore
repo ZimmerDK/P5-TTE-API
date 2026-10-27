@@ -1,6 +1,6 @@
 # Python virtual environments & compiled files
-ml-service/
-ml-service/app.py
+# ml-service/
+# ml-service/app.py
 .venv/
 __pycache__/
 *.pyc

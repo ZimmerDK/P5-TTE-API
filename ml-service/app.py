@@ -44,6 +44,7 @@ class PredictionRequest(BaseModel):
 class PredictionResponse(BaseModel):
     estimated_travel_time_seconds: float
     segment_predictions: list[float | None] = Field(default_factory=list)
+    model_name: str | None = None
 
 
 def load_model() -> Any:
@@ -102,9 +103,11 @@ def predict(request: PredictionRequest) -> PredictionResponse:
 
     segment_predictions = values.tolist() if values.size == len(request.segment_features) else []
     total = float(values.sum()) if segment_predictions else float(values[0])
+    model_name = os.path.splitext(os.path.basename(_model_path()))[0]
     return PredictionResponse(
         estimated_travel_time_seconds=total,
         segment_predictions=segment_predictions,
+        model_name=model_name,
     )
 
 

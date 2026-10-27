@@ -15,7 +15,8 @@ public sealed class RouteModelOptions
 
 public sealed record ModelPrediction(
     double ModelRouteTimeSeconds,
-    IReadOnlyList<double?> ModelSegmentTimes);
+    IReadOnlyList<double?> ModelSegmentTimes,
+    string ModelName = "route_time_model_v1");
 
 public interface ITravelTimeModelRunner
 {
@@ -42,7 +43,8 @@ public sealed class TravelTimeModelRunner(
             .ToArray();
         return Task.FromResult(new ModelPrediction(
             segmentPredictions.Sum(value => value ?? 0),
-            segmentPredictions));
+            segmentPredictions,
+            "placeholder_model"));
     }
 
     private static double[] PredictPlaceholderSegments(

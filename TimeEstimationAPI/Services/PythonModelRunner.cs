@@ -18,9 +18,14 @@ public sealed class PythonModelRunner(
         CancellationToken cancellationToken)
     {
         var response = await SendAsync(featureVector, cancellationToken);
+        var modelName = !string.IsNullOrWhiteSpace(response.ModelName)
+            ? response.ModelName
+            : featureVector.ModelName;
+
         return new ModelPrediction(
             response.ModelRouteTimeSeconds,
-            response.ModelSegmentTimes);
+            response.ModelSegmentTimes,
+            modelName);
     }
 
     private async Task<PythonPredictionResponse> SendAsync(
@@ -100,7 +105,9 @@ public sealed class PythonModelRunner(
         [property: JsonPropertyName("estimated_travel_time_seconds")]
         double ModelRouteTimeSeconds,
         [property: JsonPropertyName("segment_predictions")]
-        IReadOnlyList<double?> ModelSegmentTimes);
+        IReadOnlyList<double?> ModelSegmentTimes,
+        [property: JsonPropertyName("model_name")]
+        string? ModelName);
 }
 
 public sealed class ModelServiceUnavailableException(string message, Exception? innerException = null)

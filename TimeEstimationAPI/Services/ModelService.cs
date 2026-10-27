@@ -60,7 +60,7 @@ public sealed class ModelService
             ProviderRouteTimeSeconds = route.ProviderRouteTimeSeconds,
             RouteProvider = route.SelectedProvider,
             RouteDistanceM = route.DistanceMeters ?? 0,
-            ModelName = vector.ModelName,
+            ModelName = prediction.ModelName,
             Route = route,
             Features = new Dictionary<string, object>
             {
