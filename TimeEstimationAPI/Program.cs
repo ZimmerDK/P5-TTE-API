@@ -42,6 +42,11 @@ builder.Services.AddHttpClient<TrafficContextEnricher>((serviceProvider, client)
 });
 
 builder.Services.AddHttpClient<PythonModelRunner>();
+builder.Services.AddHttpClient<IGeocodingService, GeocodingService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0 (development)");
+});
 
 // Keep the rest of the app independent from the actual route-data source.
 // Development uses stable local data; setting Osm:UseOsrm switches to live calls.

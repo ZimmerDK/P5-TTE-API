@@ -43,7 +43,10 @@ public sealed class OsmOptions
 }
 
 /// <summary>Geocode stops, asks OSRM for route steps, then maps them to segments.</summary>
-public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> options) : IRouteProvider
+public sealed class OsrmService(
+    HttpClient httpClient,
+    IOptions<OsmOptions> options,
+    IGeocodingService geocodingService) : IRouteProvider
 {
     private readonly OsmOptions _options = options.Value;
     public string Name => "OSRM";
@@ -184,22 +187,8 @@ public sealed class OsrmService(HttpClient httpClient, IOptions<OsmOptions> opti
             ? duration.GetDouble()
             : double.Parse(duration.GetString()!.TrimEnd('s'), CultureInfo.InvariantCulture);
 
-    private async Task<RoutePoint> GeocodeAsync(string query, CancellationToken cancellationToken)
-    {
-        var url = $"{_options.GeocodingUrl}?format=jsonv2&limit=1&q={Uri.EscapeDataString(query)}";
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var results = await response.Content.ReadFromJsonAsync<JsonElement[]>(
-            cancellationToken: cancellationToken);
-        var result = results?.FirstOrDefault()
-            ?? throw new InvalidOperationException($"Location '{query}' could not be geocoded.");
-        return new RoutePoint(
-            double.Parse(result.GetProperty("lon").GetString()!, CultureInfo.InvariantCulture),
-            double.Parse(result.GetProperty("lat").GetString()!, CultureInfo.InvariantCulture));
-    }
+    private Task<RoutePoint> GeocodeAsync(string query, CancellationToken cancellationToken) =>
+        geocodingService.GeocodeAsync(_options.GeocodingUrl, query, cancellationToken);
 }
 
 /// <summary>Predictable offline provider used for local development and tests.</summary>

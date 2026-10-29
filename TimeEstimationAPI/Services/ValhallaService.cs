@@ -17,7 +17,8 @@ public sealed class ValhallaOptions
 /// <summary>Gets route distance and duration from Valhalla.</summary>
 public sealed class ValhallaService(
     HttpClient httpClient,
-    IOptions<ValhallaOptions> options) : IRouteProvider
+    IOptions<ValhallaOptions> options,
+    IGeocodingService geocodingService) : IRouteProvider
 {
     private readonly ValhallaOptions _options = options.Value;
     public string Name => "Valhalla";
@@ -115,18 +116,7 @@ public sealed class ValhallaService(
         string query,
         CancellationToken cancellationToken)
     {
-        var url = $"{_options.GeocodingUrl}?format=jsonv2&limit=1&q={Uri.EscapeDataString(query)}";
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var results = await response.Content.ReadFromJsonAsync<JsonElement[]>(
-            cancellationToken: cancellationToken);
-        var result = results?.FirstOrDefault()
-            ?? throw new InvalidOperationException($"Location '{query}' could not be geocoded.");
-        return (
-            double.Parse(result.GetProperty("lon").GetString()!, CultureInfo.InvariantCulture),
-            double.Parse(result.GetProperty("lat").GetString()!, CultureInfo.InvariantCulture));
+        var point = await geocodingService.GeocodeAsync(_options.GeocodingUrl, query, cancellationToken);
+        return (point.Longitude, point.Latitude);
     }
 }
