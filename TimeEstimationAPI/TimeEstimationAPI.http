@@ -80,7 +80,18 @@ Content-Type: application/json
   "source": "Aalborg Station, Denmark",
   "destination": "Karolinelundsvej 45, 9000 Aalborg, Denmark",
   "via": [],
-  "departureTime": "2026-10-27T08:30:00+01:00",
+  "departureTime": "2026-10-27T14:30:00+01:00",
+  "mode": "car"
+}
+
+### Estimate Route (Complex Address with Unit Detail: Thulevej to Gallery Hair)
+POST {{apiBaseUrl}}/api/routes/estimate
+Content-Type: application/json
+
+{
+  "source": "Thulevej 44, 4.tv, 9210 Aalborg SØ, Denmark",
+  "destination": "Gallery Hair, Hadsundvej 140A, 9000 Aalborg, Denmark",
+  "departureTime": "2026-10-27T14:30:00+01:00",
   "mode": "car"
 }
 

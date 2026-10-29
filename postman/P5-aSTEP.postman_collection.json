@@ -181,6 +181,53 @@
             }
           ]
         },
+		{
+          "name": "Est Route (Complex Addresses: Thulevej to Gallery Hair)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"Thulevej 44, 4.tv, 9210 Aalborg SØ, Denmark\",\n  \"destination\": \"Gallery Hair, Hadsundvej 140A, 9000 Aalborg, Denmark\",\n  \"via\": [],\n  \"departureTime\": \"2026-10-27T14:30:00+01:00\",\n  \"mode\": \"car\"\n}"
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/api/routes/estimate",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "routes",
+                "estimate"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains totalEstimatedSeconds\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"totalEstimatedSeconds\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
         {
           "name": "Est Route (Short Local Route: Aalborg Station to Karolinelundsvej 45 (Shell))",
           "request": {

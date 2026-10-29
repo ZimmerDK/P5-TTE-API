@@ -6,3 +6,4 @@ ml-service/.venv/
 ml-service/.env
 # ml-service/models/
 *.joblib
+.service-state.json

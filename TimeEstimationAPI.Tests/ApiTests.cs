@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
+using TimeEstimationAPI.Services;
 using Xunit;
 
 public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
@@ -170,5 +172,44 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         var root = document.RootElement;
         Assert.True(root.GetProperty("modelRouteTimeSeconds").GetDouble() > 0);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("providerRouteTimeSeconds").ValueKind);
+    }
+
+    [Fact]
+    public void GeocodingService_generates_correct_fallback_candidates()
+    {
+        var service = new GeocodingService(new HttpClient(), NullLogger<GeocodingService>.Instance);
+
+        var candidates1 = service.GenerateCandidateQueries("Salling Aarhus, Søndergade 27, 8000 Aarhus");
+        Assert.Equal("Salling Aarhus, Søndergade 27, 8000 Aarhus", candidates1[0]);
+        Assert.Contains("Søndergade 27, 8000 Aarhus", candidates1);
+        Assert.Contains("Salling Aarhus, 8000 Aarhus", candidates1);
+        Assert.DoesNotContain("8000 Aarhus", candidates1);
+
+        var candidates2 = service.GenerateCandidateQueries("Lynge Kirke, Lynge Bygade 18B, 3540 Lynge");
+        Assert.Equal("Lynge Kirke, Lynge Bygade 18B, 3540 Lynge", candidates2[0]);
+        Assert.Contains("Lynge Bygade 18B, 3540 Lynge", candidates2);
+        Assert.Contains("Lynge Kirke, 3540 Lynge", candidates2);
+        Assert.DoesNotContain("3540 Lynge", candidates2);
+
+        var candidates3 = service.GenerateCandidateQueries("Colosseum, Piazza del Colosseo 1, 00184 Roma RM, Italy");
+        Assert.Equal("Colosseum, Piazza del Colosseo 1, 00184 Roma RM, Italy", candidates3[0]);
+        Assert.Contains("Piazza del Colosseo 1, 00184 Roma RM, Italy", candidates3);
+
+        // Address with floor/unit specifier (4.tv) and country
+        var candidates4 = service.GenerateCandidateQueries("Thulevej 44, 4.tv, 9210 Aalborg SØ, Denmark");
+        Assert.Equal("Thulevej 44, 4.tv, 9210 Aalborg SØ, Denmark", candidates4[0]);
+        Assert.Contains("Thulevej 44, 9210 Aalborg SØ, Denmark", candidates4);
+        Assert.Contains("Thulevej 44 4.tv, 9210 Aalborg SØ, Denmark", candidates4);
+        Assert.Contains("Thulevej 44, 9210 Aalborg SØ", candidates4);
+        // Must NOT drop street name to fall back to postal code, city, or country
+        Assert.DoesNotContain("9210 Aalborg SØ, Denmark", candidates4);
+        Assert.DoesNotContain("9210 Aalborg SØ", candidates4);
+        Assert.DoesNotContain("Denmark", candidates4);
+
+        // US address with suite and country
+        var candidates5 = service.GenerateCandidateQueries("100 Main Street, Apt 4B, New York, NY 10001, USA");
+        Assert.Contains("100 Main Street, New York, NY 10001, USA", candidates5);
+        Assert.DoesNotContain("New York, NY 10001, USA", candidates5);
+        Assert.DoesNotContain("USA", candidates5);
     }
 }
