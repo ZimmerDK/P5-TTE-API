@@ -7,6 +7,11 @@ Run the API locally using .NET 9 SDK:
 dotnet run --launch-profile http
 ```
 
+To then hot-reload services on demand when using the launcher script:
+```powershell
+.\Reload-Services.ps1
+```
+
 The API will start at `http://localhost:5073`. You can test endpoints using [`TimeEstimationAPI.http`](./TimeEstimationAPI.http).
 
 To run unit tests:
@@ -25,6 +30,7 @@ Settings can be configured in `appsettings.json` or via environment variables:
 - **Route Providers**:
   - `Osm:UseOsrm`: Set to `true` to use live public OSRM and Nominatim endpoints for routing and geocoding.
   - `Osm:UseOverpass`: Set to `true` to enrich OSRM segments with road tags (speed limits, lanes, bridge/tunnel) from Overpass (rarely works tbh).
+  - `Context:Enabled`: Set to `true` to enrich route segments with spatial density context (road density, population density, built volume density) from the Context microservice (`Context:BaseUrl` = `http://localhost:8010/`). The Spatial Context service must be started manually (e.g. via Docker Compose at `C:\Dev\spatial-context-service.v2`).
   - `Valhalla:Enabled`: Set to `true` to use a local Valhalla routing server if available (TBD — Doesn't work at all yet).
 
 ---
@@ -33,5 +39,6 @@ Settings can be configured in `appsettings.json` or via environment variables:
 - [`Program.cs`](./Program.cs:1) — Dependency injection configuration and HTTP endpoint definitions.
 - [`Services/RouteDataCollector.cs`](./Services/RouteDataCollector.cs:1) — Coordinates route queries across configured providers.
 - [`Services/OsmTagEnricher.cs`](./Services/OsmTagEnricher.cs:1) — Enriches route segments using Overpass OSM queries.
+- [`Services/TrafficContextEnricher.cs`](./Services/TrafficContextEnricher.cs:1) — Enriches route segments with spatial context density metrics from `http://localhost:8010/context`.
 - [`Services/FeatureTransformer.cs`](./Services/FeatureTransformer.cs:1) — Converts route data into feature vectors for model prediction.
 - [`Services/PythonModelRunner.cs`](./Services/PythonModelRunner.cs:1) — HTTP client connecting to the FastAPI Python ML service.

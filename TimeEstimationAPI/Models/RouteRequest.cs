@@ -41,4 +41,12 @@ public sealed record RouteSegmentInput
     public bool? IsIntersection { get; init; }
     public bool? IsBridge { get; init; }
     public bool? IsTunnel { get; init; }
+    /// <summary>Primary density value supplied directly or enriched from context service.</summary>
+    public double? Density { get; init; }
+    /// <summary>Road network density in km per km2.</summary>
+    public double? RoadDensity { get; init; }
+    /// <summary>Population density in people per km2.</summary>
+    public double? PopulationDensity { get; init; }
+    /// <summary>Built volume density in m3 per m2.</summary>
+    public double? BuiltVolumeDensity { get; init; }
 }

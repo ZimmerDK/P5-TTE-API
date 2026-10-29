@@ -1,7 +1,9 @@
 param(
     [string]$ModelPath = "",
     [switch]$UseOsrm,
-    [switch]$UseOverpass
+    [switch]$UseOverpass,
+    [switch]$UseContext,
+    [switch]$Watch
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,7 +60,12 @@ if (-not (Test-Path $resolvedModelPath)) {
 }
 
 $pythonArguments = @(
-    "-m", "uvicorn", "app:app",
+    "-m", "uvicorn", "app:app"
+)
+if ($Watch) {
+    $pythonArguments += "--reload"
+}
+$pythonArguments += @(
     "--host", "127.0.0.1",
     "--port", "8001"
 )
@@ -76,6 +83,11 @@ if ($UseOverpass) {
 } else {
     $env:Osm__UseOverpass = "false"
 }
+if ($UseContext) {
+    $env:Context__Enabled = "true"
+} else {
+    $env:Context__Enabled = "false"
+}
 
 $pythonProcess = Start-Process `
     -FilePath $pythonExecutable `
@@ -83,14 +95,37 @@ $pythonProcess = Start-Process `
     -WorkingDirectory $pythonDirectory `
     -PassThru
 
+$apiArguments = if ($Watch) {
+    @("watch", "run", "--project", $apiProject, "--launch-profile", "http")
+} else {
+    @("run", "--project", $apiProject, "--launch-profile", "http")
+}
+
 $apiProcess = Start-Process `
     -FilePath "dotnet" `
-    -ArgumentList "run", "--project", $apiProject, "--launch-profile", "http" `
+    -ArgumentList $apiArguments `
     -WorkingDirectory $PSScriptRoot `
     -PassThru
 
+$stateFile = Join-Path $PSScriptRoot ".service-state.json"
+$stateData = @{
+    Pids = @($pythonProcess.Id, $apiProcess.Id)
+    ModelPath = $ModelPath
+    UseOsrm = [bool]$UseOsrm
+    UseOverpass = [bool]$UseOverpass
+    UseContext = [bool]$UseContext
+    Watch = [bool]$Watch
+}
+$stateData | ConvertTo-Json | Set-Content -Path $stateFile -Force
+
 Write-Host "Python model service started with PID $($pythonProcess.Id) at http://127.0.0.1:8001"
 Write-Host "ASP.NET API started with PID $($apiProcess.Id) at http://localhost:5073"
+if ($Watch) {
+    Write-Host "Auto-reload on save is ENABLED."
+} else {
+    Write-Host "Auto-reload on save is DISABLED (default)."
+    Write-Host "To hot-reload services on demand when ready, run: .\Reload-Services.ps1"
+}
 if ($UseOsrm) {
     Write-Host "OSRM/Nominatim routing is enabled."
 }
@@ -99,12 +134,23 @@ if ($UseOverpass) {
 } else {
     Write-Host "Overpass OSM tag enrichment is disabled (using fallback tags)."
 }
-Write-Host "Current model info:"
-Write-Host "  http://127.0.0.1:8001/model-info"
+if ($UseContext) {
+    Write-Host "Spatial context density enrichment is enabled (Context__Enabled = true)."
+    Write-Host "Note: Spatial context service must be started manually if needed (e.g., via Docker):"
+    Write-Host "  cd C:\Dev\spatial-context-service.v2; docker compose up -d --build"
+} else {
+    Write-Host "Spatial context density enrichment is disabled."
+}
 Write-Host ""
 Write-Host "Health checks:"
 Write-Host "  http://127.0.0.1:8001/health"
+if ($UseContext) {
+    Write-Host "  http://localhost:8010/health"
+}
 Write-Host "  http://localhost:5073/health"
 Write-Host ""
-Write-Host "Stop both processes with:"
-Write-Host "  Stop-Process -Id $($pythonProcess.Id),$($apiProcess.Id)"
+Write-Host "Reload services on command:"
+Write-Host "  .\Reload-Services.ps1"
+Write-Host ""
+Write-Host "Stop local background processes:"
+Write-Host "  .\Reload-Services.ps1 -StopOnly  (or Stop-Process -Id $($pythonProcess.Id),$($apiProcess.Id))"

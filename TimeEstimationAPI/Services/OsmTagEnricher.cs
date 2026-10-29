@@ -44,8 +44,8 @@ public sealed class OsmTagEnricher(
         var west = points.Min(point => point.Longitude);
         var east = points.Max(point => point.Longitude);
         var ways = new List<OsmWay>();
-        // Cap bounding box queries to a maximum of 5 to avoid rate-limiting/timeouts on long routes.
-        foreach (var box in CreateBoundingBoxes(south, west, north, east).Take(5))
+        // Cap bounding box queries to a maximum of 15 to avoid rate-limiting/timeouts on long routes while providing sufficient spatial coverage.
+        foreach (var box in CreateBoundingBoxes(south, west, north, east).Take(15))
         {
             if (cancellationToken.IsCancellationRequested)
                 break;

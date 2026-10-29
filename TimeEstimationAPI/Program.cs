@@ -11,6 +11,7 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.Configure<RouteModelOptions>(builder.Configuration.GetSection("Model"));
 builder.Services.Configure<OsmOptions>(builder.Configuration.GetSection("Osm"));
 builder.Services.Configure<ValhallaOptions>(builder.Configuration.GetSection("Valhalla"));
+builder.Services.Configure<ContextOptions>(builder.Configuration.GetSection("Context"));
 
 // This client is used for both Nominatim/OSM geocoding and the OSRM route call.
 // The public services are fine for occasional manual tests, not heavy polling for actual "real" use.
@@ -28,6 +29,14 @@ builder.Services.AddHttpClient<ValhallaService>(client =>
 
 builder.Services.AddHttpClient<OsmTagEnricher>(client =>
 {
+    client.Timeout = TimeSpan.FromSeconds(5);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0 (development)");
+});
+
+builder.Services.AddHttpClient<TrafficContextEnricher>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ContextOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/", UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(5);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0 (development)");
 });
@@ -50,7 +59,7 @@ builder.Services.AddSingleton<IEnumerable<IRouteProvider>>(serviceProvider =>
         : new DevelopmentRouteProvider());
     return providers;
 });
-builder.Services.AddSingleton<RouteDataCollector>();
+builder.Services.AddTransient<RouteDataCollector>();
 builder.Services.AddSingleton<FeatureTransformer>();
 builder.Services.AddSingleton<TravelTimeModelRunner>();
 builder.Services.AddSingleton<ITravelTimeModelRunner>(serviceProvider =>
@@ -65,7 +74,7 @@ builder.Services.AddSingleton<ITravelTimeModelRunner>(serviceProvider =>
 
     return serviceProvider.GetRequiredService<TravelTimeModelRunner>();
 });
-builder.Services.AddSingleton<ModelService>();
+builder.Services.AddTransient<ModelService>();
 
 var app = builder.Build();
 

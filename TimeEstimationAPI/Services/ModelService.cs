@@ -8,15 +8,18 @@ public sealed class ModelService
     private readonly RouteDataCollector _collector;
     private readonly FeatureTransformer _featureTransformer;
     private readonly ITravelTimeModelRunner _modelRunner;
+    private readonly TrafficContextEnricher _contextEnricher;
 
     public ModelService(
         RouteDataCollector collector,
         FeatureTransformer featureTransformer,
-        ITravelTimeModelRunner modelRunner)
+        ITravelTimeModelRunner modelRunner,
+        TrafficContextEnricher contextEnricher)
     {
         _collector = collector;
         _featureTransformer = featureTransformer;
         _modelRunner = modelRunner;
+        _contextEnricher = contextEnricher;
     }
 
     /// <summary>
@@ -33,6 +36,12 @@ public sealed class ModelService
         var route = request.Segments.Count > 0
             ? CreateRouteFromSegments(request)
             : await _collector.CollectAsync(request, cancellationToken);
+
+        if (request.Segments.Count > 0)
+        {
+            var enrichedSegments = await _contextEnricher.EnrichAsync(route.Segments, cancellationToken);
+            route = route with { Segments = enrichedSegments };
+        }
 
         var vector = _featureTransformer.Transform(route);
         var prediction = await _modelRunner.PredictAsync(vector, cancellationToken);
@@ -101,6 +110,10 @@ public sealed class ModelService
             IsIntersection = segment.IsIntersection,
             IsBridge = segment.IsBridge,
             IsTunnel = segment.IsTunnel,
+            Density = segment.Density ?? segment.RoadDensity ?? segment.PopulationDensity,
+            RoadDensity = segment.RoadDensity,
+            PopulationDensity = segment.PopulationDensity,
+            BuiltVolumeDensity = segment.BuiltVolumeDensity,
             MissingData = MissingFields(segment)
         }).ToArray();
 
@@ -131,6 +144,7 @@ public sealed class ModelService
         if (!segment.IsIntersection.HasValue) missing.Add("isIntersection");
         if (!segment.IsBridge.HasValue) missing.Add("isBridge");
         if (!segment.IsTunnel.HasValue) missing.Add("isTunnel");
+        if (!segment.Density.HasValue && !segment.RoadDensity.HasValue && !segment.PopulationDensity.HasValue) missing.Add("density");
         return missing;
     }
 }

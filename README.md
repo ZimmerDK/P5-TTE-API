@@ -13,13 +13,41 @@ Copy-Item ml-service\.env.example ml-service\.env
 Place the MLM trained `.joblib` model files into `ml-service\models\` (e.g. `XGBRegressor.joblib`) and change the `MODEL_NAME` in `ml-service\.env`.
 
 ### 2. Start Services
+#### Option A: Launcher Script (`Start-LocalServices.ps1`)
 Run the launcher script to start both the Python ML service and the ASP.NET Core API:
 ```powershell
-.\Start-LocalServices.ps1 -UseOsrm
+# Start local API & Python ML service:
+.\Start-LocalServices.ps1 -UseOsrm -UseContext
+
+# Hot reload services on command when code updated:
+.\Reload-Services.ps1
+
+# Stop local services when done:
+.\Reload-Services.ps1 -StopOnly
 ```
 
 - **ASP.NET Core API**: `http://localhost:5073`
 - **Python ML Service**: `http://127.0.0.1:8001`
+- **Spatial Context Service** (manually run if needed, e.g., on via Docker):
+  ```powershell
+  cd C:\Dev\spatial-context-service.v2
+  docker compose up -d --build
+  ```
+
+#### Option B: MANUAL | Run Individually in VS Code Terminals
+1. **ASP.NET Core API**:
+   ```powershell
+   dotnet run --project TimeEstimationAPI\TimeEstimationAPI.csproj --launch-profile http
+   ```
+2. **Python ML Service**:
+   ```powershell
+   .\ml-service\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8001
+   ```
+3. **Spatial Context Service (Docker)**:
+   ```powershell
+   cd C:\Dev\spatial-context-service.v2
+   docker compose up -d --build
+   ```
 
 Use the Postman collection in `postman/` or `TimeEstimationAPI/TimeEstimationAPI.http` to send test requests.
 
@@ -38,7 +66,7 @@ Use the Postman collection in `postman/` or `TimeEstimationAPI/TimeEstimationAPI
 {
   "source": "Aalborg Station, Denmark",
   "destination": "Karolinelundsvej 45, 9000 Aalborg, Denmark",
-  "departureTime": "2026-10-27T08:30:00+01:00",
+  "departureTime": "2026-10-27T14:30:00+01:00",
   "mode": "car"
 }
 ```
@@ -48,5 +76,6 @@ Use the Postman collection in `postman/` or `TimeEstimationAPI/TimeEstimationAPI
 ## Project Structure
 - [`TimeEstimationAPI/`](./TimeEstimationAPI/README.md) — ASP.NET Core web API handling routing provider integration, OSM enrichment, and feature formatting.
 - [`ml-service/`](./ml-service/README.md) — FastAPI Python service that loads `.joblib` model artifacts and serves HTTP predictions.
-- [`Start-LocalServices.ps1`](./Start-LocalServices.ps1) — PowerShell script to launch both services in parallel locally.
+- [`Start-LocalServices.ps1`](./Start-LocalServices.ps1) — PowerShell script to launch local services in parallel.
+- [`Reload-Services.ps1`](./Reload-Services.ps1) — PowerShell script to hot-reload local services on demand.
 - [`postman/`](./postman/) — Postman API request collection.

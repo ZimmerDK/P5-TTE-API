@@ -7,7 +7,8 @@ using System.Text.Json;
 public sealed class RouteDataCollector(
     IEnumerable<IRouteProvider> providers,
     ILogger<RouteDataCollector> logger,
-    OsmTagEnricher osmTagEnricher)
+    OsmTagEnricher osmTagEnricher,
+    TrafficContextEnricher contextEnricher)
 {
     /// <summary>Collects route data and records which fields were not available.</summary>
     public async Task<UnifiedRoute> CollectAsync(RouteRequest request, CancellationToken cancellationToken)
@@ -29,6 +30,7 @@ public sealed class RouteDataCollector(
 
                 // Split long segments into smaller sub-segments (< 200 meters) for high-accuracy ML estimation.
                 data.Segments = SplitSegments(data.Segments, 200.0);
+                data.Segments = await contextEnricher.EnrichAsync(data.Segments, cancellationToken);
                 providerData.Add(ToProviderData(data));
             }
             catch (HttpRequestException exception)

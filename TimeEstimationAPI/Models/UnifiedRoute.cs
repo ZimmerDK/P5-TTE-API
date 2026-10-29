@@ -21,6 +21,12 @@ public sealed record RouteSegment
     public bool? IsIntersection { get; init; }
     public bool? IsBridge { get; init; }
     public bool? IsTunnel { get; init; }
+    public bool? IsOneway { get; init; }
+    public double? Density { get; init; }
+    public double? RoadDensity { get; init; }
+    public double? PopulationDensity { get; init; }
+    public double? BuiltVolumeDensity { get; init; }
+    public double? BuiltUpFraction { get; init; }
     public IReadOnlyCollection<string> MissingData { get; init; } = [];
 }
 
