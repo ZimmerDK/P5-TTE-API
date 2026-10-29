@@ -1,10 +1,8 @@
 # Project TODOs
-
 These are deliberately kept at the repository root so they are easy to find
 before changing routing, feature engineering, or model integration.
 
 ## Decide what a model segment is
-
 - [ ] Confirm the model's exact segment unit with the ML team.
 - [ ] Decide whether one segment means a Valhalla maneuver, Valhalla edge,
       OSM way, road section between intersections, or a project-specific unit.
@@ -14,7 +12,6 @@ before changing routing, feature engineering, or model integration.
       intentionally neutral because this decision is still open.
 
 ## Make Valhalla work locally
-
 - [ ] Set up and verify a local Valhalla server with a small OSM `.osm.pbf`
       extract and generated Valhalla tiles.
 - [ ] Prefer a separate setup script and/or container for downloading map data,
@@ -24,7 +21,6 @@ before changing routing, feature engineering, or model integration.
       actual response shape.
 
 ## Improve OSM enrichment
-
 - [x] Query OSM way geometry through Overpass and split large route areas into
       smaller bounded requests.
 - [x] Match the full OSRM step geometry rather than only its midpoint.
@@ -36,12 +32,11 @@ before changing routing, feature engineering, or model integration.
       authoritative road identity is required.
 
 ## Align model features
-
 - [x] Implement segment-level prediction: one model row and one prediction per
       ordered route segment, with route time equal to their sum.
 - [ ] Verify the implementation with the ML team's expected multi-segment
       request and confirm the trained model's output semantics.
-- [ ] Confirm that `matched_length_m` is the map-matched length of each
+- [x] Confirm that `matched_length_m` is the map-matched length of each
       individual segment, not the full route length.
 - [ ] Confirm the current zero defaults for `density`, `bridge`, and `tunnel`
       against the training pipeline.
@@ -54,7 +49,6 @@ before changing routing, feature engineering, or model integration.
       comparison/diagnostic value.
 
 ## Define time semantics
-
 - [ ] Decide whether departure-time features use UTC, the route's local
       timezone, or an explicitly supplied timezone.
 - [ ] Make the API and training pipeline use the same choice, including daylight
