@@ -7,12 +7,9 @@ public sealed class FeatureTransformer
 {
     public RouteFeatureVector Transform(UnifiedRoute route)
     {
-        // TODO: Confirm whether MLM training uses UTC, the route's local timezone, or another explicit timezone.
-        // To avoid silently changing behavior, this currently uses the machine's local timezone.
-        var localTime = route.DepartureTime.ToLocalTime();
-        /*var utcTime = route.DepartureTime.UtcDateTime;*/
-        var hour = localTime.Hour + localTime.Minute / 60.0;
-        var minute = localTime.Minute + localTime.Second / 60.0;
+        var localDeparture = route.DepartureTime.ToLocalTime();
+        var hour = localDeparture.Hour + localDeparture.Minute / 60.0;
+        var minute = localDeparture.Minute + localDeparture.Second / 60.0;
 
         var timeFeatures = new[]
         {
@@ -36,10 +33,8 @@ public sealed class FeatureTransformer
 
         var orderedSegments = segments.OrderBy(segment => segment.Sequence).ToArray();
         var sequence = orderedSegments
-            .OrderBy(segment => segment.Sequence)
             .Select(segment => new[]
             {
-                // TODO(ML): Replace every provisional unit, clamp, divisor, and category code below with the training pipeline's exact schtuff.
                 Math.Max(segment.LengthMeters ?? 0, 0) / 1000.0,
                 Math.Clamp(segment.SpeedLimitKmh ?? 0, 0, 130) / 130.0,
                 RoadTypeCode(segment.RoadType),
@@ -47,11 +42,11 @@ public sealed class FeatureTransformer
                 segment.IsRoundabout == true ? 1.0 : 0.0,
                 segment.HasTrafficSignal == true ? 1.0 : 0.0,
                 segment.IsIntersection == true ? 1.0 : 0.0,
-                1.0, // urban/weather data is not supplied by the providers yet
+                1.0,
                 segment.MissingData.Count > 0 || route.MissingData.Count > 0 ? 1.0 : 0.0
             })
             .ToArray();
-        var localDeparture = route.DepartureTime.ToLocalTime();
+
         var segmentFeatures = orderedSegments
             .Select((segment, index) =>
             {

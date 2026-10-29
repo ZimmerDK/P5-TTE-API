@@ -21,17 +21,11 @@ public sealed class GeocodingService(
     HttpClient httpClient,
     ILogger<GeocodingService> logger) : IGeocodingService
 {
-    private static readonly Regex UnitSpecifierRegex = new(
-        @"^(?i)(\d+\.\s*(tv|th|mf|sal|fl|floor)\.?|(st|kld)\.\s*(tv|th|mf)\.?|(apt|apartment|suite|ste|unit|bldg|building|fl|floor|rm|room|opgang|whg|app|box|door|sal|kld|st)\.?\s*#?[\w-]+|\d+(st|nd|rd|th)\s+floor|#[\w-]+)$",
-        RegexOptions.Compiled);
+    private const string UnitPattern = @"\d+\.\s*(tv|th|mf|sal|fl|floor)\.?|(st|kld)\.\s*(tv|th|mf)\.?|(apt|apartment|suite|ste|unit|bldg|building|fl|floor|rm|room|opgang|whg|app|box|door|sal|kld|st)\.?\s*#?[\w-]+|\d+(st|nd|rd|th)\s+floor|#[\w-]+";
 
-    private static readonly Regex EmbeddedUnitRegex = new(
-        @"(?i)\b(\d+\.\s*(tv|th|mf|sal|fl|floor)\.?|(st|kld)\.\s*(tv|th|mf)\.?|(apt|apartment|suite|ste|unit|bldg|building|fl|floor|rm|room|opgang|whg|app|box|door)\.?\s*#?[\w-]+|\d+(st|nd|rd|th)\s+floor|#[\w-]+)\b",
-        RegexOptions.Compiled);
-
-    private static readonly Regex MultipleSpacesRegex = new(
-        @"\s+",
-        RegexOptions.Compiled);
+    private static readonly Regex UnitSpecifierRegex = new($"^(?i)({UnitPattern})$", RegexOptions.Compiled);
+    private static readonly Regex EmbeddedUnitRegex = new($@"(?i)\b({UnitPattern})\b", RegexOptions.Compiled);
+    private static readonly Regex MultipleSpacesRegex = new(@"\s+", RegexOptions.Compiled);
 
     public async Task<RoutePoint> GeocodeAsync(
         string geocodingUrl,
@@ -74,37 +68,28 @@ public sealed class GeocodingService(
         var trimmed = rawQuery.Trim();
         var parts = trimmed.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        var candidates = new List<string>();
-
         if (parts.Length <= 1)
         {
-            candidates.Add(trimmed);
             var cleanedSingle = CleanEmbeddedUnits(trimmed);
-            if (!string.Equals(cleanedSingle, trimmed, StringComparison.OrdinalIgnoreCase))
-            {
-                candidates.Add(cleanedSingle);
-            }
-            return candidates;
+            return string.Equals(cleanedSingle, trimmed, StringComparison.OrdinalIgnoreCase)
+                ? [trimmed]
+                : [trimmed, cleanedSingle];
         }
 
         // 1. Original full query
-        candidates.Add(trimmed);
+        var candidates = new List<string> { trimmed };
 
-        // Analyze parts for unit specifiers
         var nonUnitParts = new List<string>();
         var inlineUnitParts = new List<string>();
         var hasUnitParts = false;
 
-        for (var i = 0; i < parts.Length; i++)
+        foreach (var p in parts)
         {
-            var p = parts[i];
             if (UnitSpecifierRegex.IsMatch(p))
             {
                 hasUnitParts = true;
                 if (inlineUnitParts.Count > 0)
-                {
-                    inlineUnitParts[^1] = $"{inlineUnitParts[^1]} {p}";
-                }
+                    inlineUnitParts[^1] += $" {p}";
             }
             else
             {
@@ -113,41 +98,23 @@ public sealed class GeocodingService(
             }
         }
 
-        // 2. Query without standalone unit specifier parts (e.g. "Thulevej 44, 9210 Aalborg SØ, Denmark")
-        if (hasUnitParts && nonUnitParts.Count > 0)
-        {
-            candidates.Add(string.Join(", ", nonUnitParts));
-        }
+        // 2. Query with inline unit specifier (e.g. "Thulevej 44 4.tv, 9210 Aalborg SØ, Denmark")
+        if (hasUnitParts && inlineUnitParts.Count > 0) candidates.Add(string.Join(", ", inlineUnitParts));
+        if (hasUnitParts && nonUnitParts.Count > 0) candidates.Add(string.Join(", ", nonUnitParts));
 
-        // 3. Query with inline unit specifier (e.g. "Thulevej 44 4.tv, 9210 Aalborg SØ, Denmark")
-        if (hasUnitParts && inlineUnitParts.Count > 0)
-        {
-            candidates.Add(string.Join(", ", inlineUnitParts));
-        }
-
-        // 4. Queries without trailing country/region component (if >= 2 parts)
+        // 3. Queries without trailing country/region component (if >= 2 parts)
         if (parts.Length >= 2)
         {
             candidates.Add(string.Join(", ", parts.SkipLast(1)));
-
-            if (hasUnitParts && nonUnitParts.Count >= 2)
-            {
-                candidates.Add(string.Join(", ", nonUnitParts.SkipLast(1)));
-            }
-
-            if (hasUnitParts && inlineUnitParts.Count >= 2)
-            {
-                candidates.Add(string.Join(", ", inlineUnitParts.SkipLast(1)));
-            }
+            if (hasUnitParts && nonUnitParts.Count >= 2) candidates.Add(string.Join(", ", nonUnitParts.SkipLast(1)));
+            if (hasUnitParts && inlineUnitParts.Count >= 2) candidates.Add(string.Join(", ", inlineUnitParts.SkipLast(1)));
         }
 
         // 5. Clean embedded unit details inside individual parts
         var embeddedCleanedParts = parts.Select(CleanEmbeddedUnits).Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
         if (embeddedCleanedParts.Count > 0)
         {
-            var cleanedCandidate = string.Join(", ", embeddedCleanedParts);
-            candidates.Add(cleanedCandidate);
-
+            candidates.Add(string.Join(", ", embeddedCleanedParts));
             if (parts.Length >= 2 && embeddedCleanedParts.Count >= 2)
             {
                 var cleanedNoCountry = string.Join(", ", embeddedCleanedParts.SkipLast(1));
@@ -156,48 +123,28 @@ public sealed class GeocodingService(
             }
         }
 
-        // 6. Drop leading part (e.g. drop POI/venue name if multiple parts present)
+        // 6. Drop leading part (e.g. drop POI/venue name if multiple parts present) (e.g. "Salling Aarhus, Søndergade 27, 8000 Aarhus" -> "Søndergade 27, 8000 Aarhus")
         if (parts.Length >= 3)
         {
             candidates.Add(string.Join(", ", parts.Skip(1)));
-            if (nonUnitParts.Count >= 3)
-            {
-                candidates.Add(string.Join(", ", nonUnitParts.Skip(1)));
-            }
-        }
-
-        // 7. Try POI name + city/zip (first part + last part before country)
-        if (parts.Length >= 3)
-        {
+            if (nonUnitParts.Count >= 3) candidates.Add(string.Join(", ", nonUnitParts.Skip(1)));
+            // 7. Try POI name + city/zip (first part + last part before country) (e.g. "Salling Aarhus, 8000 Aarhus")
             var lastLocality = parts.Length >= 4 ? parts[^2] : parts[^1];
             candidates.Add($"{parts[0]}, {lastLocality}");
         }
 
-        // Determine required street/POI location anchors that MUST be preserved in candidates
         var requiredAnchors = GetRequiredLocationAnchors(parts, nonUnitParts);
-
-        // Filter out candidates that are invalid, too broad, or lose street/POI location precision
         var countryPart = parts[^1].Trim();
-        var result = new List<string>();
 
-        foreach (var c in candidates)
-        {
-            var cTrimmed = c.Trim();
-            if (string.IsNullOrWhiteSpace(cTrimmed))
-                continue;
-
-            // Reject single country-only fallback when original query had street/city detail
-            if (parts.Length >= 2 && string.Equals(cTrimmed, countryPart, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            // Reject candidates that drop street/POI location anchors
-            if (requiredAnchors.Count > 0 && !requiredAnchors.Any(anchor => Regex.IsMatch(cTrimmed, $@"\b{Regex.Escape(anchor)}\b", RegexOptions.IgnoreCase)))
-                continue;
-
-            result.Add(cTrimmed);
-        }
-
-        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return candidates
+            .Select(c => c.Trim())
+            .Where(c => !string.IsNullOrWhiteSpace(c) &&
+                        // Reject single country-only fallback when original query had street/city detail
+                        !(parts.Length >= 2 && string.Equals(c, countryPart, StringComparison.OrdinalIgnoreCase)) &&
+                        // Reject candidates that drop street/POI location anchors
+                        (requiredAnchors.Count == 0 || requiredAnchors.Any(anchor => Regex.IsMatch(c, $@"\b{Regex.Escape(anchor)}\b", RegexOptions.IgnoreCase))))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static List<string> GetRequiredLocationAnchors(string[] parts, List<string> nonUnitParts)
@@ -207,23 +154,19 @@ public sealed class GeocodingService(
             return requiredAnchors;
 
         // Primary anchor: first non-unit part
-        AddAnchorTerms(requiredAnchors, nonUnitParts[0]);
+        AddAnchorTerms(requiredAnchors, nonUnitParts[0]); 
 
         // Secondary anchor: second non-unit part if present and first is a pure venue name while second is a street address
         if (nonUnitParts.Count >= 3)
         {
-            var firstPart = nonUnitParts[0];
-            var secondPart = nonUnitParts[1];
-
-            var secondLooksLikeStreet = Regex.IsMatch(secondPart, @"(?i)\b(street|gade|vej|straße|str|via|piazza|road|rd|avenue|ave|blvd|drive|dr|lane|ln|way|place|pl|square|sq)\b") ||
-                (secondPart.Any(char.IsDigit) && !Regex.IsMatch(secondPart, @"^\d{4,5}\b"));
-
-            var firstIsPureVenue = !firstPart.Any(char.IsDigit) && !Regex.IsMatch(firstPart, @"(?i)\b(street|gade|vej|straße|str|via|piazza|road|rd|avenue|ave|blvd|drive|dr|lane|ln|way|place|pl|square|sq)\b");
+            var first = nonUnitParts[0];
+            var second = nonUnitParts[1];
+            const string streetPattern = @"(?i)\b(street|gade|vej|straße|str|via|piazza|road|rd|avenue|ave|blvd|drive|dr|lane|ln|way|place|pl|square|sq)\b";
+            var secondLooksLikeStreet = Regex.IsMatch(second, streetPattern) || (second.Any(char.IsDigit) && !Regex.IsMatch(second, @"^\d{4,5}\b"));
+            var firstIsPureVenue = !first.Any(char.IsDigit) && !Regex.IsMatch(first, streetPattern);
 
             if (firstIsPureVenue && secondLooksLikeStreet)
-            {
-                AddAnchorTerms(requiredAnchors, secondPart);
-            }
+                AddAnchorTerms(requiredAnchors, second);
         }
 
         return requiredAnchors;
@@ -236,27 +179,18 @@ public sealed class GeocodingService(
             return;
 
         anchors.Add(cleaned);
-
-        var tokens = cleaned.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        foreach (var token in tokens)
+        foreach (var token in cleaned.Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
             var word = token.Trim(',', '.', '#');
             if (word.Length >= 3 && !word.All(char.IsDigit))
-            {
                 anchors.Add(word);
-            }
         }
     }
 
-    private static string CleanEmbeddedUnits(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-            return text;
-
-        var cleaned = EmbeddedUnitRegex.Replace(text, " ");
-        cleaned = MultipleSpacesRegex.Replace(cleaned, " ").Trim();
-        return cleaned;
-    }
+    private static string CleanEmbeddedUnits(string text) =>
+        string.IsNullOrWhiteSpace(text)
+            ? text
+            : MultipleSpacesRegex.Replace(EmbeddedUnitRegex.Replace(text, " "), " ").Trim();
 
     private async Task<RoutePoint?> TryGeocodeSingleAsync(
         string geocodingUrl,

@@ -78,9 +78,8 @@ public sealed class RouteDataCollector(
         };
     }
 
-    private static RouteProviderData ToProviderData(ProviderRouteResult data)
-    {
-        return new RouteProviderData
+    private static RouteProviderData ToProviderData(ProviderRouteResult data) =>
+        new()
         {
             Provider = data.Provider,
             DistanceMeters = data.DistanceMeters,
@@ -92,7 +91,6 @@ public sealed class RouteDataCollector(
             MissingFields = data.MissingFields,
             Segments = data.Segments
         };
-    }
 
     private void RecordProviderFailure(
         IRouteProvider provider,
@@ -134,10 +132,7 @@ public sealed class RouteDataCollector(
 
             var partsCount = (int)Math.Ceiling(length / maxSegmentLengthMeters);
             var subLength = length / partsCount;
-            var subDuration = segment.ProviderSegmentTimeSeconds.HasValue
-                ? segment.ProviderSegmentTimeSeconds.Value / partsCount
-                : (double?)null;
-
+            var subDuration = segment.ProviderSegmentTimeSeconds / partsCount;
             var points = segment.Geometry;
 
             for (var i = 0; i < partsCount; i++)
@@ -146,8 +141,7 @@ public sealed class RouteDataCollector(
                 if (points.Count > 0)
                 {
                     var startIdx = (int)Math.Floor((double)i * points.Count / partsCount);
-                    var endIdx = (int)Math.Ceiling((double)(i + 1) * points.Count / partsCount);
-                    endIdx = Math.Min(endIdx, points.Count);
+                    var endIdx = Math.Min((int)Math.Ceiling((double)(i + 1) * points.Count / partsCount), points.Count);
                     subGeometry = points.Skip(startIdx).Take(Math.Max(1, endIdx - startIdx)).ToArray();
                 }
 
@@ -160,9 +154,9 @@ public sealed class RouteDataCollector(
                     RoadType = segment.RoadType,
                     SpeedLimitKmh = segment.SpeedLimitKmh,
                     LaneCount = segment.LaneCount,
-                    IsRoundabout = i == 0 ? segment.IsRoundabout : false,
-                    HasTrafficSignal = i == partsCount - 1 ? segment.HasTrafficSignal : false,
-                    IsIntersection = i == 0 || i == partsCount - 1 ? segment.IsIntersection : false,
+                    IsRoundabout = i == 0 && segment.IsRoundabout == true,
+                    HasTrafficSignal = i == partsCount - 1 && segment.HasTrafficSignal == true,
+                    IsIntersection = (i == 0 || i == partsCount - 1) && segment.IsIntersection == true,
                     IsBridge = segment.IsBridge,
                     IsTunnel = segment.IsTunnel,
                     Geometry = subGeometry,
