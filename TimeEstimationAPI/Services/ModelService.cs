@@ -43,23 +43,21 @@ public sealed class ModelService
             route = route with { Segments = enrichedSegments };
         }
 
-        var vector = _featureTransformer.Transform(route);
-        var prediction = await _modelRunner.PredictAsync(vector, cancellationToken);
-        if (prediction.ModelSegmentTimes.Count != route.Segments.Count)
-        {
-            throw new ModelServiceUnavailableException(
-                $"The model returned {prediction.ModelSegmentTimes.Count} segment predictions for {route.Segments.Count} route segments.");
-        }
+        // Pass 1 gives every segment the departure time. Pass 2 gives each segment the time it is
+        // reached: departure plus the pass 1 times of all earlier segments. Exact would be predicting
+        // segment by segment, see TODO.md.
+        var (firstPassTimes, _) = await PredictSegmentsAsync(route, null, cancellationToken);
+        var startOffsets = new double[firstPassTimes.Length];
+        for (var index = 1; index < startOffsets.Length; index++)
+            startOffsets[index] = startOffsets[index - 1] + firstPassTimes[index - 1];
 
-        var segmentPredictions = prediction.ModelSegmentTimes
-            .Select(value => value ?? throw new ModelServiceUnavailableException(
-                "The model returned a missing segment prediction."))
-            .ToArray();
+        var (segmentPredictions, modelName) = await PredictSegmentsAsync(route, startOffsets, cancellationToken);
         route = route with
         {
             Segments = route.Segments.Select((segment, index) => segment with
             {
-                ModelSegmentTimeSeconds = segmentPredictions[index]
+                ModelSegmentTimeSeconds = segmentPredictions[index],
+                EnterTime = route.DepartureTime.AddSeconds(startOffsets[index])
             }).ToArray()
         };
 
@@ -69,7 +67,7 @@ public sealed class ModelService
             ProviderRouteTimeSeconds = route.ProviderRouteTimeSeconds,
             RouteProvider = route.SelectedProvider,
             RouteDistanceM = route.DistanceMeters ?? 0,
-            ModelName = prediction.ModelName,
+            ModelName = modelName,
             Route = route,
             Features = new Dictionary<string, object>
             {
@@ -83,6 +81,27 @@ public sealed class ModelService
                 ["missingDataFields"] = route.MissingData
             }
         };
+    }
+
+    /// <summary>Predicts one time per route segment, with each segment entered at departure plus its start offset.</summary>
+    private async Task<(double[] Times, string ModelName)> PredictSegmentsAsync(
+        UnifiedRoute route,
+        IReadOnlyList<double>? startOffsets,
+        CancellationToken cancellationToken)
+    {
+        var vector = _featureTransformer.Transform(route, startOffsets);
+        var prediction = await _modelRunner.PredictAsync(vector, cancellationToken);
+        if (prediction.ModelSegmentTimes.Count != route.Segments.Count)
+        {
+            throw new ModelServiceUnavailableException(
+                $"The model returned {prediction.ModelSegmentTimes.Count} segment predictions for {route.Segments.Count} route segments.");
+        }
+
+        var times = prediction.ModelSegmentTimes
+            .Select(value => value ?? throw new ModelServiceUnavailableException(
+                "The model returned a missing segment prediction."))
+            .ToArray();
+        return (times, prediction.ModelName);
     }
 
     /// <summary>Runs only the configured model for an explicit segment route.</summary>

@@ -53,3 +53,12 @@ before changing routing, feature engineering, or model integration.
       timezone, or an explicitly supplied timezone.
 - [ ] Make the API and training pipeline use the same choice, including daylight
       saving-time behavior.
+- [x] Give each segment the time it is entered instead of the departure time.
+      `ModelService` currently predicts twice: pass 1 at departure time, pass 2
+      with start times from the pass 1 predictions.
+- [ ] Replace the two passes with exact sequential prediction: predict segment
+      0, add its time to the clock, predict segment 1 at that time, and so on.
+      This is more correct, since each start time then comes from the final
+      predictions of the earlier segments. Done per HTTP call it would be ~600
+      calls for a long route, so do the loop inside the Python ml-service (it
+      would then need to build the `*_enter_time` features from a timestamp).

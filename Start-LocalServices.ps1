@@ -77,6 +77,11 @@ $env:Model__UsePythonService = "true"
 $env:Model__PythonServiceUrl = "http://127.0.0.1:8001"
 if ($UseOsrm) {
     $env:Osm__UseOsrm = "true"
+    # router.project-osrm.org only accepts TLS 1.3 over HTTPS, which .NET can't use on Windows 10.
+    # The public demo server also answers over plain HTTP.
+    if (-not $env:Osm__RoutingUrl) {
+        $env:Osm__RoutingUrl = "http://router.project-osrm.org/route/v1/driving"
+    }
 }
 if ($UseOverpass) {
     $env:Osm__UseOverpass = "true"

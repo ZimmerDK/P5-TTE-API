@@ -28,8 +28,13 @@ public sealed class RouteDataCollector(
                 if (provider is OsrmService)
                     data.Segments = await osmTagEnricher.EnrichAsync(data.Segments, cancellationToken);
 
-                // Split long segments into smaller sub-segments (< 200 meters) for high-accuracy ML estimation.
-                data.Segments = SplitSegments(data.Segments, 200.0);
+                // OSRM ends every leg with a 0 m "arrive" step. The model still predicts ~25 s for it, so drop it.
+                data.Segments = data.Segments.Where(segment => segment.LengthMeters is not 0).ToArray();
+
+                // Split long segments into smaller sub-segments for high-accuracy ML estimation.
+                // Motorway pieces are longer, since motorway edges in the training data are ~430 m (median),
+                // and the model predicts unrealistically slow motorways for 200 m pieces.
+                data.Segments = SplitSegments(data.Segments, 200.0, motorwayMaxSegmentLengthMeters: 600.0);
                 data.Segments = await contextEnricher.EnrichAsync(data.Segments, cancellationToken);
                 providerData.Add(ToProviderData(data));
             }
@@ -108,12 +113,14 @@ public sealed class RouteDataCollector(
     }
 
     /// <summary>
-    /// Splits long route segments into smaller sub-segments under <paramref name="maxSegmentLengthMeters"/> (default 200m).
+    /// Splits long route segments into smaller sub-segments under <paramref name="maxSegmentLengthMeters"/> (default 200m),
+    /// or <paramref name="motorwayMaxSegmentLengthMeters"/> for motorways when given.
     /// Scaled duration and length proportionally while preserving road type, speed limit, lanes, and OSM way IDs.
     /// </summary>
     public static IReadOnlyList<RouteSegment> SplitSegments(
         IReadOnlyList<RouteSegment> segments,
-        double maxSegmentLengthMeters = 200.0)
+        double maxSegmentLengthMeters = 200.0,
+        double? motorwayMaxSegmentLengthMeters = null)
     {
         if (segments.Count == 0)
             return segments;
@@ -124,13 +131,16 @@ public sealed class RouteDataCollector(
         foreach (var segment in segments)
         {
             var length = segment.LengthMeters ?? 0;
-            if (length <= maxSegmentLengthMeters || length <= 0)
+            var maxLength = string.Equals(segment.RoadType, "motorway", StringComparison.OrdinalIgnoreCase)
+                ? motorwayMaxSegmentLengthMeters ?? maxSegmentLengthMeters
+                : maxSegmentLengthMeters;
+            if (length <= maxLength || length <= 0)
             {
                 result.Add(segment with { Sequence = sequence++ });
                 continue;
             }
 
-            var partsCount = (int)Math.Ceiling(length / maxSegmentLengthMeters);
+            var partsCount = (int)Math.Ceiling(length / maxLength);
             var subLength = length / partsCount;
             var subDuration = segment.ProviderSegmentTimeSeconds / partsCount;
             var points = segment.Geometry;

@@ -104,6 +104,7 @@ public sealed class TrafficContextEnricher(
                     PopulationDensity = populationDensity,
                     BuiltVolumeDensity = builtVolumeDensity,
                     BuiltUpFraction = builtUpFraction,
+                    ContextFeatures = metrics.ContextFeatures,
                     MissingData = missing
                 });
             }
@@ -203,7 +204,8 @@ public sealed class TrafficContextEnricher(
                 }
             }
 
-            return new ContextFetchResult(false, new ContextMetrics(roadDensity, populationDensity, builtVolumeDensity, builtUpFraction));
+            return new ContextFetchResult(false, new ContextMetrics(
+                roadDensity, populationDensity, builtVolumeDensity, builtUpFraction, ReadContextFeatures(root)));
         }
         catch (HttpRequestException ex)
         {
@@ -222,11 +224,65 @@ public sealed class TrafficContextEnricher(
         }
     }
 
+    /// <summary>
+    /// Reads every radius from the context response, using the same names and fields as the
+    /// training data (enrich_edges_context_v2.py in the spatial context service).
+    /// </summary>
+    private static IReadOnlyDictionary<string, double> ReadContextFeatures(JsonElement root)
+    {
+        var contextFeatures = new Dictionary<string, double>();
+
+        if (root.TryGetProperty("features", out var featuresProp) && featuresProp.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var radius in featuresProp.EnumerateObject())
+            {
+                AddNumber(contextFeatures, $"pop_density_{radius.Name}m", radius.Value, "population_density_people_km2");
+                AddNumber(contextFeatures, $"built_up_fraction_{radius.Name}m", radius.Value, "built_up_fraction");
+                AddNumber(contextFeatures, $"built_volume_density_{radius.Name}m", radius.Value, "built_volume_density_m3_per_m2");
+            }
+        }
+
+        if (root.TryGetProperty("roads", out var roadsProp) &&
+            roadsProp.ValueKind == JsonValueKind.Object &&
+            roadsProp.TryGetProperty("radii", out var radiiProp) &&
+            radiiProp.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var radius in radiiProp.EnumerateObject())
+            {
+                AddNumber(contextFeatures, $"road_density_{radius.Name}m", radius.Value, "road_density_km_per_km2");
+                AddNumber(contextFeatures, $"intersection_density_{radius.Name}m", radius.Value, "intersection_density_per_km2");
+                AddNumber(contextFeatures, $"three_way_intersection_density_{radius.Name}m", radius.Value, "three_way_intersection_density_per_km2");
+                AddNumber(contextFeatures, $"four_plus_intersection_density_{radius.Name}m", radius.Value, "four_plus_intersection_density_per_km2");
+            }
+        }
+
+        if (root.TryGetProperty("settlement", out var settlementProp) &&
+            settlementProp.ValueKind == JsonValueKind.Object &&
+            settlementProp.TryGetProperty("available", out var availableProp) &&
+            availableProp.ValueKind == JsonValueKind.True)
+        {
+            AddNumber(contextFeatures, "settlement_code", settlementProp, "code");
+        }
+
+        return contextFeatures;
+    }
+
+    private static void AddNumber(Dictionary<string, double> target, string name, JsonElement source, string property)
+    {
+        if (source.ValueKind == JsonValueKind.Object &&
+            source.TryGetProperty(property, out var value) &&
+            value.ValueKind == JsonValueKind.Number)
+        {
+            target[name] = value.GetDouble();
+        }
+    }
+
     private sealed record ContextFetchResult(bool IsUnreachable, ContextMetrics? Metrics);
 
     private sealed record ContextMetrics(
         double? RoadDensity,
         double? PopulationDensity,
         double? BuiltVolumeDensity,
-        double? BuiltUpFraction);
+        double? BuiltUpFraction,
+        IReadOnlyDictionary<string, double> ContextFeatures);
 }

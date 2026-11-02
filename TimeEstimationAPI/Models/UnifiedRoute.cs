@@ -12,6 +12,8 @@ public sealed record RouteSegment
     public double? LengthMeters { get; init; }
     public double? ProviderSegmentTimeSeconds { get; init; }
     public double? ModelSegmentTimeSeconds { get; init; }
+    /// <summary>Moment the model assumed this segment is entered: departure plus the predicted times of all earlier segments.</summary>
+    public DateTimeOffset? EnterTime { get; init; }
     public long? OsmWayId { get; init; }
     public string? RoadType { get; init; }
     public double? SpeedLimitKmh { get; init; }
@@ -27,6 +29,11 @@ public sealed record RouteSegment
     public double? PopulationDensity { get; init; }
     public double? BuiltVolumeDensity { get; init; }
     public double? BuiltUpFraction { get; init; }
+    /// <summary>
+    /// All values from the context service, named like the model features
+    /// (e.g. pop_density_100m, intersection_density_500m, settlement_code).
+    /// </summary>
+    public IReadOnlyDictionary<string, double> ContextFeatures { get; init; } = new Dictionary<string, double>();
     public IReadOnlyCollection<string> MissingData { get; init; } = [];
 }
 
