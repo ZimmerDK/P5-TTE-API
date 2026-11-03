@@ -30,7 +30,9 @@ Settings can be configured in `appsettings.json` or via environment variables:
 - **Route Providers**:
   - `Osm:UseOsrm`: Set to `true` to use live public OSRM and Nominatim endpoints for routing and geocoding.
   - `Osm:UseOverpass`: Set to `true` to enrich OSRM segments with road tags (speed limits, lanes, bridge/tunnel) from Overpass (rarely works tbh).
-  - `Context:Enabled`: Set to `true` to enrich route segments with spatial density context (road density, population density, built volume density) from the Context microservice (`Context:BaseUrl` = `http://localhost:8010/`). The Spatial Context service must be started manually (e.g. via Docker Compose at `C:\Dev\spatial-context-service.v2`).
+  - `Context:Enabled`: Set to `true` to enrich route segments with spatial density context (road density, population density, built volume density) from the Context microservice.
+  - `Context:BaseUrl`: Context service base URL, for example `http://130.225.39.125:8010/`.
+  - `Context:ApiKey`: Optional API key sent as the `X-API-Key` header. Store it in the ignored `ml-service\.env` file, not in tracked configuration.
   - `Valhalla:Enabled`: Set to `true` to use a local Valhalla routing server if available (TBD — Doesn't work at all yet).
 
 ---
@@ -39,6 +41,6 @@ Settings can be configured in `appsettings.json` or via environment variables:
 - [`Program.cs`](./Program.cs:1) — Dependency injection configuration and HTTP endpoint definitions.
 - [`Services/RouteDataCollector.cs`](./Services/RouteDataCollector.cs:1) — Coordinates route queries across configured providers.
 - [`Services/OsmTagEnricher.cs`](./Services/OsmTagEnricher.cs:1) — Enriches route segments using Overpass OSM queries.
-- [`Services/TrafficContextEnricher.cs`](./Services/TrafficContextEnricher.cs:1) — Enriches route segments with spatial context density metrics from `http://localhost:8010/context`.
+- [`Services/TrafficContextEnricher.cs`](./Services/TrafficContextEnricher.cs:1) — Enriches route segments with spatial context density metrics from the configured `/context` endpoint.
 - [`Services/FeatureTransformer.cs`](./Services/FeatureTransformer.cs:1) — Converts route data into feature vectors for model prediction.
 - [`Services/PythonModelRunner.cs`](./Services/PythonModelRunner.cs:1) — HTTP client connecting to the FastAPI Python ML service.

@@ -38,6 +38,8 @@ builder.Services.AddHttpClient<TrafficContextEnricher>((serviceProvider, client)
     var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ContextOptions>>().Value;
     client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/", UriKind.Absolute);
     client.Timeout = TimeSpan.FromSeconds(5);
+    if (!string.IsNullOrWhiteSpace(options.ApiKey))
+        client.DefaultRequestHeaders.Add("X-API-Key", options.ApiKey);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0 (development)");
 });
 

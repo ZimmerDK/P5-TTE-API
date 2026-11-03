@@ -95,6 +95,31 @@ $pythonProcess = Start-Process `
     -WorkingDirectory $pythonDirectory `
     -PassThru
 
+$pythonReady = $false
+for ($attempt = 1; $attempt -le 30; $attempt++) {
+    if ($pythonProcess.HasExited) {
+        throw "Python model service exited during startup with code $($pythonProcess.ExitCode)."
+    }
+
+    try {
+        $healthResponse = Invoke-WebRequest `
+            -Uri "http://127.0.0.1:8001/health" `
+            -UseBasicParsing `
+            -TimeoutSec 2
+        if ($healthResponse.StatusCode -eq 200) {
+            $pythonReady = $true
+            break
+        }
+    } catch {
+        Start-Sleep -Seconds 1
+    }
+}
+
+if (-not $pythonReady) {
+    Stop-Process -Id $pythonProcess.Id -Force -ErrorAction SilentlyContinue
+    throw "Python model service did not become ready at http://127.0.0.1:8001 within 30 seconds."
+}
+
 $apiArguments = if ($Watch) {
     @("watch", "run", "--project", $apiProject, "--launch-profile", "http")
 } else {

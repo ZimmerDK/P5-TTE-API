@@ -11,6 +11,7 @@ namespace TimeEstimationAPI.Services;
 public sealed class ContextOptions
 {
     public string BaseUrl { get; set; } = "http://localhost:8010/";
+    public string ApiKey { get; set; } = string.Empty;
     public bool Enabled { get; set; } = true;
     public int RadiusMeters { get; set; } = 500;
     public double DefaultYear { get; set; } = 2026.0;
