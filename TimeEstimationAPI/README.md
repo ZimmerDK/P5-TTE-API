@@ -25,8 +25,7 @@ dotnet test ..\TimeEstimationAPI.Tests\TimeEstimationAPI.Tests.csproj
 Settings can be configured in `appsettings.json` or via environment variables:
 
 - **Model Backend**:
-  - `Model:UsePlaceholder`: Set to `true` for standalone development without running the Python ML service.
-  - `Model:UsePythonService`: Set to `true` to send segment feature vectors to the Python ML service at `Model:PythonServiceUrl` (`http://127.0.0.1:8001`).
+  - `Model:PythonServiceUrl`: URL of the Python ML service that receives segment feature vectors (`http://127.0.0.1:8001` by default).
 - **Route Providers**:
   - `Osm:UseOsrm`: Set to `true` to use live public OSRM and Nominatim endpoints for routing and geocoding.
   - `Osm:UseOverpass`: Set to `true` to enrich OSRM segments with road tags (speed limits, lanes, bridge/tunnel) from Overpass (rarely works tbh).

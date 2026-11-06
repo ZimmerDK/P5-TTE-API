@@ -68,19 +68,7 @@ builder.Services.AddSingleton<IEnumerable<IRouteProvider>>(serviceProvider =>
 });
 builder.Services.AddTransient<RouteDataCollector>();
 builder.Services.AddSingleton<FeatureTransformer>();
-builder.Services.AddSingleton<TravelTimeModelRunner>();
-builder.Services.AddSingleton<ITravelTimeModelRunner>(serviceProvider =>
-{
-    var options = serviceProvider
-        .GetRequiredService<Microsoft.Extensions.Options.IOptions<RouteModelOptions>>().Value;
-    if (options.UsePythonService && !options.UsePlaceholder)
-        return serviceProvider.GetRequiredService<PythonModelRunner>();
-    if (!options.UsePlaceholder)
-        throw new InvalidOperationException(
-            "No model backend is configured. Enable Model:UsePythonService or Model:UsePlaceholder.");
-
-    return serviceProvider.GetRequiredService<TravelTimeModelRunner>();
-});
+builder.Services.AddSingleton<ITravelTimeModelRunner, PythonModelRunner>();
 builder.Services.AddTransient<ModelService>();
 
 var app = builder.Build();

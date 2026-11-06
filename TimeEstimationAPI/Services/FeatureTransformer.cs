@@ -8,16 +8,6 @@ public sealed class FeatureTransformer
     public RouteFeatureVector Transform(UnifiedRoute route)
     {
         var localDeparture = route.DepartureTime.ToLocalTime();
-        var hour = localDeparture.Hour + localDeparture.Minute / 60.0;
-        var minute = localDeparture.Minute + localDeparture.Second / 60.0;
-
-        var timeFeatures = new[]
-        {
-            Math.Sin(2 * Math.PI * hour / 24.0),
-            Math.Cos(2 * Math.PI * hour / 24.0),
-            Math.Sin(2 * Math.PI * minute / 60.0),
-            Math.Cos(2 * Math.PI * minute / 60.0)
-        };
 
         var segments = route.Segments.Count > 0
             ? route.Segments
@@ -112,16 +102,7 @@ public sealed class FeatureTransformer
         return new RouteFeatureVector
         {
             Sequence = sequence,
-            TimeFeatures = timeFeatures,
             SegmentFeatures = segmentFeatures,
-            RouteFeatures = new Dictionary<string, object?>
-            {
-                ["matched_length_m"] = Math.Max(route.DistanceMeters ?? orderedSegments.Sum(segment => segment.LengthMeters ?? 0), 0),
-                ["hour"] = localDeparture.Hour,
-                ["minute"] = localDeparture.Minute,
-                ["day_of_week"] = (int)localDeparture.DayOfWeek,
-                ["month"] = localDeparture.Month
-            },
             ModelName = "route_time_model_v1"
         };
     }

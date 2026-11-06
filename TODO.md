@@ -41,9 +41,9 @@ before changing routing, feature engineering, or model integration.
       .NET client. Prediction now accepts segment rows only.
 - [x] Ignore unknown prediction fields while the model contract is provisional;
       continue rejecting requests without usable segment features.
-- [ ] Decide whether to retain the local placeholder model. If the Python
-      service becomes mandatory, remove `ModelRunner`, `UsePlaceholder`, and
-      the development-only fallback configuration/tests.
+- [x] Remove the local placeholder model. Production predictions now always
+      use the configured Python model service; tests inject a deterministic
+      test runner instead of shipping fake prediction logic.
 - [ ] Decide which legacy feature aliases remain required by trained models.
       The current fields (`matched_length_m`, `hour`, `minute`, `day_of_week`,
       `month`, `density`, `lane_count`, and `internal_intersection`) are not

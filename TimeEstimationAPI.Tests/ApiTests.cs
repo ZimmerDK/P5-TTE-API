@@ -1,8 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
+using TimeEstimationAPI.Models;
 using TimeEstimationAPI.Services;
 using Xunit;
 
@@ -12,7 +16,14 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
 
     public ApiTests(WebApplicationFactory<Program> factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ITravelTimeModelRunner>();
+                services.AddSingleton<ITravelTimeModelRunner, TestModelRunner>();
+            });
+        }).CreateClient();
     }
 
     [Fact]
@@ -43,7 +54,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task Estimate_returns_unified_route_and_placeholder_estimate()
+    public async Task Estimate_returns_unified_route_and_model_estimate()
     {
         var response = await _client.PostAsJsonAsync("/api/routes/estimate", new
         {
@@ -211,5 +222,16 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Contains("100 Main Street, New York, NY 10001, USA", candidates5);
         Assert.DoesNotContain("New York, NY 10001, USA", candidates5);
         Assert.DoesNotContain("USA", candidates5);
+    }
+
+    private sealed class TestModelRunner : ITravelTimeModelRunner
+    {
+        public Task<ModelPrediction> PredictAsync(
+            RouteFeatureVector featureVector,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ModelPrediction(
+                featureVector.Sequence.Length,
+                Enumerable.Repeat<double?>(1, featureVector.Sequence.Length).ToArray(),
+                "test-model"));
     }
 }

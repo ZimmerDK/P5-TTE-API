@@ -71,9 +71,6 @@ $pythonArguments += @(
 )
 
 $env:MODEL_PATH = $resolvedModelPath
-$env:MODEL_INPUT_MODE = if ($env:MODEL_INPUT_MODE) { $env:MODEL_INPUT_MODE } else { "segments" }
-$env:Model__UsePlaceholder = "false"
-$env:Model__UsePythonService = "true"
 $env:Model__PythonServiceUrl = "http://127.0.0.1:8001"
 if ($UseOsrm) {
     $env:Osm__UseOsrm = "true"
