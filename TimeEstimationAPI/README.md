@@ -38,6 +38,10 @@ Settings can be configured in `appsettings.json` or via environment variables:
 
 ## Key Files
 - [`Program.cs`](./Program.cs:1) — Dependency injection configuration and HTTP endpoint definitions.
+- [`Services/RouteProvider.cs`](./Services/RouteProvider.cs:1) — Shared route-provider contract, result model, and provider exception.
+- [`Services/OsrmService.cs`](./Services/OsrmService.cs:1) — OSRM integration and OSRM response parsing.
+- [`Services/ValhallaService.cs`](./Services/ValhallaService.cs:1) — Valhalla routing integration.
+- [`Services/DevelopmentRouteProvider.cs`](./Services/DevelopmentRouteProvider.cs:1) — Deterministic offline route provider used when live OSRM is disabled.
 - [`Services/RouteDataCollector.cs`](./Services/RouteDataCollector.cs:1) — Coordinates route queries across configured providers.
 - [`Services/OsmTagEnricher.cs`](./Services/OsmTagEnricher.cs:1) — Enriches route segments using Overpass OSM queries.
 - [`Services/TrafficContextEnricher.cs`](./Services/TrafficContextEnricher.cs:1) — Enriches route segments with spatial context density metrics from the configured `/context` endpoint.

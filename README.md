@@ -75,6 +75,9 @@ Use the Postman collection in `postman/` or `TimeEstimationAPI/TimeEstimationAPI
 
 ## Project Structure
 - [`TimeEstimationAPI/`](./TimeEstimationAPI/README.md) — ASP.NET Core web API handling routing provider integration, OSM enrichment, and feature formatting.
+- [`TimeEstimationAPI/Services/OsrmService.cs`](./TimeEstimationAPI/Services/OsrmService.cs) — OSRM integration and route-step parsing.
+- [`TimeEstimationAPI/Services/ValhallaService.cs`](./TimeEstimationAPI/Services/ValhallaService.cs) — Valhalla routing integration.
+- [`TimeEstimationAPI/Services/DevelopmentRouteProvider.cs`](./TimeEstimationAPI/Services/DevelopmentRouteProvider.cs) — Offline provider used for local development.
 - [`ml-service/`](./ml-service/README.md) — FastAPI Python service that loads `.joblib` model artifacts and serves HTTP predictions.
 - [`Start-LocalServices.ps1`](./Start-LocalServices.ps1) — PowerShell script to launch local services in parallel.
 - [`Reload-Services.ps1`](./Reload-Services.ps1) — PowerShell script to hot-reload local services on demand.
