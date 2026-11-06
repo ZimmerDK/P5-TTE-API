@@ -2,7 +2,7 @@
 ASP.NET Core web service that orchestrates route data collection from map providers (OSRM / Valhalla), enriches route segments with OpenStreetMap tags (via Overpass), and formats feature matrices for travel time prediction.
 
 ## Quickstart
-Run the API locally using .NET 9 SDK:
+Run the API locally using the .NET 10 SDK:
 ```powershell
 dotnet run --launch-profile http
 ```

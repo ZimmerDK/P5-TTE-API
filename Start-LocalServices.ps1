@@ -22,7 +22,7 @@ $modelFileNames = @{
     LinearRegression = "LinearRegression.joblib"
     RandomForestRegressor = "RandomForestRegressor.joblib"
     Ridge = "Ridge.joblib"
-    XGBRegressor = "XGBRegressor.joblib"
+    XGBRegressor = "XGBRegressor.json"
 }
 
 if (Test-Path $envFile) {

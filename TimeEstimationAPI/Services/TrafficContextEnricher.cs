@@ -47,8 +47,7 @@ public sealed class TrafficContextEnricher(
 
         foreach (var segment in segments)
         {
-            if (cancellationToken.IsCancellationRequested)
-                break;
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Preserve existing density values if provided
             if (segment.Density.HasValue && segment.RoadDensity.HasValue && segment.PopulationDensity.HasValue)

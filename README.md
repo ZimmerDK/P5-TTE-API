@@ -3,14 +3,14 @@ A 5th-semester project API for predicting route travel times using our ML model.
 
 ## Quickstart
 ### 1. First-time Setup
-Create the '.env' config file and ensure that Python 3.10+ and .NET 9 SDK are installed:
+Create the '.env' config file and ensure that Python 3.12+ and .NET 10 SDK are installed:
 ```powershell
 python -m venv ml-service\.venv
 .\ml-service\.venv\Scripts\python.exe -m pip install -r ml-service\requirements.txt
 Copy-Item ml-service\.env.example ml-service\.env
 ```
 
-Place the MLM trained `.joblib` model files into `ml-service\models\` (e.g. `XGBRegressor.joblib`) and change the `MODEL_NAME` in `ml-service\.env`.
+Place the trained ML model file (`.joblib` or `.json`) into `ml-service\models\` (e.g. `XGBRegressor.json` for XGBoost) and change the `MODEL_NAME` in `ml-service\.env`.
 
 ### 2. Start Services
 #### Option A: Launcher Script (`Start-LocalServices.ps1`)

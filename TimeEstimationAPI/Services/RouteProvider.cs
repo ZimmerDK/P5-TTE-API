@@ -31,6 +31,9 @@ public sealed class ProviderRouteResult
     public IReadOnlyList<RouteSegment> Segments { get; set; } = [];
 }
 
+public sealed class RouteProviderUnavailableException(string message)
+    : Exception(message);
+
 /// <summary>Endpoints and switches for the optional live OSRM provider.</summary>
 public sealed class OsmOptions
 {

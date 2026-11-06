@@ -34,15 +34,7 @@ public sealed class PythonModelRunner(
     {
         var request = new PythonPredictionRequest(
             featureVector.ModelName,
-            featureVector.RouteFeatures,
-            featureVector.SegmentFeatures,
-            new Dictionary<string, object?>
-            {
-                ["sinHour"] = featureVector.TimeFeatures.ElementAtOrDefault(0),
-                ["cosHour"] = featureVector.TimeFeatures.ElementAtOrDefault(1),
-                ["sinMinute"] = featureVector.TimeFeatures.ElementAtOrDefault(2),
-                ["cosMinute"] = featureVector.TimeFeatures.ElementAtOrDefault(3)
-            });
+            featureVector.SegmentFeatures);
 
         HttpResponseMessage response;
         try
@@ -97,9 +89,7 @@ public sealed class PythonModelRunner(
 
     private sealed record PythonPredictionRequest(
         string ModelName,
-        IReadOnlyDictionary<string, object?> RouteFeatures,
-        IReadOnlyList<IReadOnlyDictionary<string, object?>> SegmentFeatures,
-        IReadOnlyDictionary<string, object?> TimeFeatures);
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> SegmentFeatures);
 
     private sealed record PythonPredictionResponse(
         [property: JsonPropertyName("estimated_travel_time_seconds")]

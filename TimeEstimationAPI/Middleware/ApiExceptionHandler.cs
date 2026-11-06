@@ -17,6 +17,7 @@ internal sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) :
         {
             ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request", exception.Message),
             ModelServiceUnavailableException => (StatusCodes.Status502BadGateway, "Model service unavailable", "The Python model service could not be reached or returned an invalid response."),
+            RouteProviderUnavailableException => (StatusCodes.Status502BadGateway, "Route provider unavailable", "No configured route provider returned usable data."),
             HttpRequestException => (StatusCodes.Status502BadGateway, "Route provider unavailable", "The route provider could not be reached."),
             _ => (StatusCodes.Status500InternalServerError, "Internal server error", "An unexpected error occurred.")
         };

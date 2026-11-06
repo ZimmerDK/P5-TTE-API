@@ -218,7 +218,19 @@ public sealed class GeocodingService(
                 return new RoutePoint(lon, lat);
             }
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            logger.LogDebug(ex, "Geocode lookup timed out for candidate '{Candidate}'.", queryCandidate);
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogDebug(ex, "Geocode lookup failed for candidate '{Candidate}'.", queryCandidate);
+        }
+        catch (JsonException ex)
         {
             logger.LogDebug(ex, "Geocode lookup failed for candidate '{Candidate}'.", queryCandidate);
         }

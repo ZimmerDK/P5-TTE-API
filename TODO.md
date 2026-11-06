@@ -12,6 +12,9 @@ before changing routing, feature engineering, or model integration.
       intentionally neutral because this decision is still open.
 
 ## Make Valhalla work locally
+- [ ] Decide whether Valhalla support is still in scope. If it is not,
+      remove `ValhallaService`, its configuration, and the related provider
+      selection logic instead of carrying an unverified adapter.
 - [ ] Set up and verify a local Valhalla server with a small OSM `.osm.pbf`
       extract and generated Valhalla tiles.
 - [ ] Prefer a separate setup script and/or container for downloading map data,
@@ -34,6 +37,19 @@ before changing routing, feature engineering, or model integration.
 ## Align model features
 - [x] Implement segment-level prediction: one model row and one prediction per
       ordered route segment, with route time equal to their sum.
+- [x] Remove unused route-level model compatibility from the Python service and
+      .NET client. Prediction now accepts segment rows only.
+- [x] Ignore unknown prediction fields while the model contract is provisional;
+      continue rejecting requests without usable segment features.
+- [ ] Decide whether to retain the local placeholder model. If the Python
+      service becomes mandatory, remove `ModelRunner`, `UsePlaceholder`, and
+      the development-only fallback configuration/tests.
+- [ ] Decide which legacy feature aliases remain required by trained models.
+      The current fields (`matched_length_m`, `hour`, `minute`, `day_of_week`,
+      `month`, `density`, `lane_count`, and `internal_intersection`) are not
+      dead code: they are still emitted in segment payloads and used by the
+      direct model/Postman examples. Remove them only after confirming that
+      all deployed models use the newer feature names.
 - [ ] Verify the implementation with the ML team's expected multi-segment
       request and confirm the trained model's output semantics.
 - [x] Confirm that `matched_length_m` is the map-matched length of each

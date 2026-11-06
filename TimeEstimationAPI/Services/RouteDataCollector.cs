@@ -45,11 +45,16 @@ public sealed class RouteDataCollector(
             {
                 RecordProviderFailure(provider, providerData, "provider-invalid-json", exception);
             }
+            catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                RecordProviderFailure(provider, providerData, "provider-timeout", exception);
+            }
         }
 
         var primary = providerData.FirstOrDefault(data => data.Provider == "Valhalla" && data.IsAvailable)
             ?? providerData.FirstOrDefault(data => data.IsAvailable)
-            ?? throw new InvalidOperationException("No route provider returned usable data.");
+            ?? throw new RouteProviderUnavailableException(
+                "No route provider returned usable data.");
 
         var missingData = new HashSet<string>(primary.MissingFields, StringComparer.OrdinalIgnoreCase);
         if (!primary.DistanceMeters.HasValue) missingData.Add("distanceMeters");

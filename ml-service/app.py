@@ -21,23 +21,16 @@ MODEL_FILE_NAMES = {
 
 
 class PredictionRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    model_name: str = Field(
+    model_name: str | None = Field(
+        default=None,
         min_length=1,
         validation_alias=AliasChoices("modelName", "model_name"),
-    )
-    route_features: dict[str, Any] = Field(
-        default_factory=dict,
-        validation_alias=AliasChoices("routeFeatures", "route_features"),
     )
     segment_features: list[dict[str, Any]] = Field(
         default_factory=list,
         validation_alias=AliasChoices("segmentFeatures", "segment_features"),
-    )
-    time_features: dict[str, Any] = Field(
-        default_factory=dict,
-        validation_alias=AliasChoices("timeFeatures", "time_features"),
     )
 
 
@@ -85,7 +78,6 @@ def model_info() -> dict[str, Any]:
     return {
         "modelPath": _model_path(),
         "modelType": type(model).__name__,
-        "inputMode": os.environ.get("MODEL_INPUT_MODE", "segments"),
         "configuredFeatures": _configured_feature_names(),
         "modelFeatures": feature_names,
     }
@@ -119,25 +111,12 @@ def predict(request: PredictionRequest) -> PredictionResponse:
 
 
 def _predict(model: Any, request: PredictionRequest) -> Any:
-    input_mode = os.environ.get("MODEL_INPUT_MODE", "segments").lower()
     feature_names = _get_model_feature_names(model)
-
-    if input_mode == "segments":
-        rows = [
-            _select_features(segment, feature_names)
-            for segment in request.segment_features
-        ]
-        model_input = pd.DataFrame(rows)
-    elif input_mode == "route":
-        row = {
-            **request.route_features,
-            **request.time_features,
-            "segmentFeatures": request.segment_features,
-        }
-        model_input = pd.DataFrame([_select_features(row, feature_names)])
-    else:
-        raise ValueError("MODEL_INPUT_MODE must be 'route' or 'segments'.")
-
+    rows = [
+        _select_features(segment, feature_names)
+        for segment in request.segment_features
+    ]
+    model_input = pd.DataFrame(rows)
     return model.predict(model_input)
 
 
