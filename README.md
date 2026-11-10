@@ -33,6 +33,53 @@ Launcher waits for the Python model service to be read/"healthy" before starting
 Use `-ApiOnly` when you made changes to only the C# code, so that the ML service doesn't reload. 
 The launcher also uses `--no-restore` for local reloads; run `dotnet restore` after changing project dependencies.
 
+### Optional Google Routes comparison
+Google integration is disabled by default. Do not paste the API key into chat,
+source code, `appsettings.json`, Postman, or a committed file. Put it only in
+the ignored local `ml-service\.env` file:
+```powershell
+GoogleMaps__ApiKey=your-key
+```
+
+Then enable it explicitly with the launcher:
+```powershell
+.\Start-LocalServices.ps1 -UseOsrm -UseGoogleMaps
+```
+
+The API uses existing OSM/Nominatim geocoding and sends only the resulting
+coordinates to Google's Routes API. Google is an additional comparison
+provider; it does not replace OSRM. The response includes optional
+`googleComparison` route and segment metrics when enabled. Leave
+`-UseGoogleMaps` out to make no Google requests. Add `-UseGoogleEnrich` to
+request the additional Google route-step fields as well:
+```powershell
+.\Start-LocalServices.ps1 -UseOsrm -UseGoogleMaps -UseGoogleEnrich
+```
+
+Individual requests can opt out even when Google is enabled globally:
+```json
+{
+  "source": "Aalborg Station, Denmark",
+  "destination": "Karolinelundsvej 45, 9000 Aalborg, Denmark",
+  "useGoogleMaps": false
+}
+```
+When `useGoogleMaps` is omitted, the launcher/configuration default is used.
+Setting it to `false` guarantees that request will not call Google.
+
+For subsequent changes, `.\Reload-Services.ps1` preserves these switches.
+Use `.\Reload-Services.ps1 -ApiOnly` for C# changes without restarting the ML
+service.
+
+Google Cloud billing and API quotas are controlled by Google Cloud, not by this
+API. Enable only the Routes API, restrict the key to the Routes API and your
+server environment, and configure a budget/quota alert. A budget alert is not
+a hard spending cap, so do not enable Google if you require an absolute
+guarantee of zero billing.
+
+Comparison deltas use `Google - comparison`: positive means Google estimated
+more seconds, while negative means Google estimated fewer seconds.
+
 - **ASP.NET Core API**: `http://localhost:5073`
 - **Python ML Service**: `http://127.0.0.1:8001`
 - **Spatial Context Service** (manually run if needed, e.g., on via Docker):
@@ -73,8 +120,7 @@ Use the Postman collection in `postman/` or `TimeEstimationAPI/TimeEstimationAPI
 {
   "source": "Aalborg Station, Denmark",
   "destination": "Karolinelundsvej 45, 9000 Aalborg, Denmark",
-  "departureTime": "2026-10-27T14:30:00+01:00",
-  "mode": "car"
+  "departureTime": "2026-10-27T14:30:00+01:00"
 }
 ```
 

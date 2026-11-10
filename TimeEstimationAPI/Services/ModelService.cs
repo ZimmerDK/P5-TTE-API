@@ -30,9 +30,6 @@ public sealed class ModelService
         RouteRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!string.Equals(request.Mode, "car", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Only the 'car' travel mode is currently supported.");
-
         var route = request.Segments.Count > 0
             ? CreateRouteFromSegments(request)
             : await _collector.CollectAsync(request, cancellationToken);
@@ -70,6 +67,7 @@ public sealed class ModelService
             RouteProvider = route.SelectedProvider,
             RouteDistanceM = route.DistanceMeters ?? 0,
             ModelName = prediction.ModelName,
+            GoogleComparison = CreateGoogleComparison(route, segmentPredictions),
             Route = route,
             Features = new Dictionary<string, object>
             {
@@ -82,6 +80,58 @@ public sealed class ModelService
                 ["missingData"] = route.MissingData.Count > 0,
                 ["missingDataFields"] = route.MissingData
             }
+        };
+    }
+
+    private static GoogleRouteComparison? CreateGoogleComparison(
+        UnifiedRoute route,
+        IReadOnlyList<double> modelSegmentTimes)
+    {
+        var google = route.ProviderData.FirstOrDefault(data =>
+            data.Provider == "Google Routes" && data.IsAvailable);
+        if (google is null)
+            return null;
+
+        var googleTotal = google.ProviderRouteTimeSeconds;
+        var providerTotal = route.ProviderRouteTimeSeconds;
+        var modelTotal = modelSegmentTimes.Sum();
+        var totalDistance = route.Segments.Sum(segment => segment.LengthMeters ?? 0);
+        var googleSegments = route.Segments.Select((segment, index) =>
+        {
+            double? weight = totalDistance > 0
+                ? (segment.LengthMeters ?? 0) / totalDistance
+                : null;
+            double? googleTime = googleTotal.HasValue && weight.HasValue
+                ? googleTotal.Value * weight.Value
+                : null;
+            var providerTime = segment.ProviderSegmentTimeSeconds;
+            var modelTime = modelSegmentTimes[index];
+            return new GoogleSegmentComparison
+            {
+                Sequence = segment.Sequence,
+                GoogleTimeSeconds = googleTime,
+                ProviderTimeSeconds = providerTime,
+                ModelTimeSeconds = modelTime,
+                GoogleVsProviderDeltaSeconds = googleTime.HasValue && providerTime.HasValue
+                    ? googleTime.GetValueOrDefault() - providerTime.GetValueOrDefault()
+                    : null,
+                GoogleVsModelDeltaSeconds = googleTime.HasValue
+                    ? googleTime.GetValueOrDefault() - modelTime
+                    : null
+            };
+        }).ToArray();
+
+        return new GoogleRouteComparison
+        {
+            GoogleRouteTimeSeconds = googleTotal,
+            GoogleDistanceMeters = google.DistanceMeters,
+            GoogleVsProviderDeltaSeconds = googleTotal.HasValue && providerTotal.HasValue
+                ? googleTotal.Value - providerTotal.Value
+                : null,
+            GoogleVsModelDeltaSeconds = googleTotal.HasValue
+                ? googleTotal.Value - modelTotal
+                : null,
+            Segments = googleSegments
         };
     }
 
@@ -123,7 +173,6 @@ public sealed class ModelService
             Destination = request.Destination ?? string.Empty,
             Via = request.Via,
             DepartureTime = request.DepartureTime,
-            Mode = request.Mode,
             DistanceMeters = segments.Sum(segment => segment.LengthMeters ?? 0),
             ProviderRouteTimeSeconds = null,
             Segments = segments,

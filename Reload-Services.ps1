@@ -50,6 +50,8 @@ if (Test-Path $stateFile) {
     if ($stateJson.UseOsrm) { $params["UseOsrm"] = $true }
     if ($stateJson.UseOverpass) { $params["UseOverpass"] = $true }
     if ($stateJson.UseContext) { $params["UseContext"] = $true }
+    if ($stateJson.UseGoogleMaps) { $params["UseGoogleMaps"] = $true }
+    if ($stateJson.UseGoogleEnrich) { $params["UseGoogleEnrich"] = $true }
     if ($stateJson.Watch) { $params["Watch"] = $true }
 }
 

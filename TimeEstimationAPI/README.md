@@ -33,6 +33,24 @@ Settings can be configured in `appsettings.json` or via environment variables:
   - `Context:BaseUrl`: Context service base URL, for example `http://130.225.39.125:8010/`.
   - `Context:ApiKey`: Optional API key sent as the `X-API-Key` header. Store it in the ignored `ml-service\.env` file, not in tracked configuration.
   - `Valhalla:Enabled`: Set to `true` to use a local Valhalla routing server if available (TBD — Doesn't work at all yet).
+  - `GoogleMaps:Enabled`: Set to `true` to make an additional Google Routes API comparison call. Disabled by default.
+  - `GoogleMaps:EnrichmentEnabled`: Set to `true` to request additional Google route-step fields. Disabled by default.
+  - `GoogleMaps:ApiKey`: Server-side Google API key, supplied through the ignored `ml-service\.env` file as `GoogleMaps__ApiKey` or through user secrets.
+  - `GoogleMaps:RoutesUrl`: Google Routes API endpoint. The default is `https://routes.googleapis.com/directions/v2:computeRoutes`.
+
+Google uses the existing OSM/Nominatim geocoding flow; it does not geocode
+addresses itself. When enabled, its route duration and distance are returned
+as `googleComparison` alongside the primary provider and model estimate.
+Google comparison is opt-in and should remain disabled unless a request needs
+it. The API key must not be committed to configuration or source control.
+
+Requests may set `useGoogleMaps` to `false` to opt out for one request even
+when the Google comparison provider is enabled globally. If omitted, the
+configured launcher setting is used.
+
+Comparison deltas use `Google - comparison`: a positive value means Google
+estimated more seconds (was slower/higher), a negative value means Google
+estimated fewer seconds (was faster/lower), and zero means they matched.
 
 ---
 

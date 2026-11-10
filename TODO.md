@@ -69,3 +69,9 @@ before changing routing, feature engineering, or model integration.
       timezone, or an explicitly supplied timezone.
 - [ ] Make the API and training pipeline use the same choice, including daylight
       saving-time behavior.
+
+## Verify Google Routes enrichment
+- [ ] On Thursday, verify that `-UseGoogleEnrich` starts successfully with
+      `-UseGoogleMaps`, makes the expected optional Google Routes request, and
+      returns or applies the intended enrichment data without affecting the
+      normal route/model response when disabled.

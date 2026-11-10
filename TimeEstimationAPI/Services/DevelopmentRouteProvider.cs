@@ -11,7 +11,8 @@ public sealed class DevelopmentRouteProvider : IRouteProvider
         string source,
         string destination,
         List<string>? waypoints,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<RoutePoint>? resolvedLocations = null)
     {
         var segmentCount = Math.Max((waypoints?.Count ?? 0) + 1, 1);
         var segments = Enumerable.Range(0, segmentCount)

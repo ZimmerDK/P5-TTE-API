@@ -133,6 +133,58 @@ public sealed class ProviderTests
         Assert.Contains("bad via", exception.Message);
     }
 
+    [Fact]
+    public async Task GoogleRoutesService_sends_ordered_via_points_and_parses_route()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        string? capturedBody = null;
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            capturedBody = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+            return JsonResponse("""
+            {
+              "routes": [{
+                "distanceMeters": 1200,
+                "duration": "90s",
+                "legs": [
+                  {"distanceMeters": 500, "duration": "40s"},
+                  {"distanceMeters": 700, "duration": "50s"}
+                ]
+              }]
+            }
+            """);
+        }));
+        var service = new GoogleRoutesService(
+            httpClient,
+            Options.Create(new GoogleMapsOptions
+            {
+                Enabled = true,
+                ApiKey = "test-key"
+            }),
+            Options.Create(new OsmOptions
+            {
+                GeocodingUrl = "https://nominatim.test/search"
+            }),
+            new MappingGeocodingService(new Dictionary<string, RoutePoint>
+            {
+                ["source"] = new(10, 55),
+                ["via"] = new(10.1, 55.1),
+                ["destination"] = new(10.2, 55.2)
+            }));
+
+        var result = await service.GetRouteMetadataAsync("source", "destination", ["via"]);
+
+        Assert.Equal(1200, result.DistanceMeters);
+        Assert.Equal(90, result.ProviderRouteTimeSeconds);
+        Assert.Equal(2, result.Segments.Count);
+        Assert.NotNull(capturedRequest);
+        Assert.Equal("test-key", capturedRequest!.Headers.GetValues("X-Goog-Api-Key").Single());
+        Assert.Contains("\"via\":true", capturedBody);
+        Assert.True(capturedBody!.IndexOf("\"longitude\":10.1", StringComparison.Ordinal)
+            > capturedBody.IndexOf("\"longitude\":10", StringComparison.Ordinal));
+    }
+
     // Checks that useful road details from Overpass get applied to the right segment.
     [Fact]
     public async Task OsmTagEnricher_applies_matching_way_tags()

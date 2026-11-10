@@ -10,7 +10,8 @@ public interface IRouteProvider
         string source,
         string destination,
         List<string>? waypoints,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<RoutePoint>? resolvedLocations = null);
 }
 
 /// <summary>Common route data returned by a routing provider.</summary>

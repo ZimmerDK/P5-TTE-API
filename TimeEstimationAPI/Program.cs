@@ -12,6 +12,7 @@ builder.Services.Configure<RouteModelOptions>(builder.Configuration.GetSection("
 builder.Services.Configure<OsmOptions>(builder.Configuration.GetSection("Osm"));
 builder.Services.Configure<ValhallaOptions>(builder.Configuration.GetSection("Valhalla"));
 builder.Services.Configure<ContextOptions>(builder.Configuration.GetSection("Context"));
+builder.Services.Configure<GoogleMapsOptions>(builder.Configuration.GetSection("GoogleMaps"));
 
 // This client is used for both Nominatim/OSM geocoding and the OSRM route call.
 // The public services are fine for occasional manual tests, not heavy polling for actual "real" use.
@@ -24,6 +25,12 @@ builder.Services.AddHttpClient<OsrmService>(client =>
 builder.Services.AddHttpClient<ValhallaService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
+});
+
+builder.Services.AddHttpClient<GoogleRoutesService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0");
 });
 
@@ -64,6 +71,10 @@ builder.Services.AddSingleton<IEnumerable<IRouteProvider>>(serviceProvider =>
     providers.Add(osmOptions.UseOsrm
         ? serviceProvider.GetRequiredService<OsrmService>()
         : new DevelopmentRouteProvider());
+
+    var googleOptions = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<GoogleMapsOptions>>().Value;
+    if (googleOptions.Enabled)
+        providers.Add(serviceProvider.GetRequiredService<GoogleRoutesService>());
     return providers;
 });
 builder.Services.AddTransient<RouteDataCollector>();

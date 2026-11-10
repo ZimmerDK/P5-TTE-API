@@ -44,7 +44,6 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
             destination = "B",
             via = new[] { "C", "D" },
             departureTime = "2026-09-24T08:30:00Z",
-            mode = "car"
         });
 
         response.EnsureSuccessStatusCode();
@@ -62,7 +61,6 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
             destination = "Gothenburg",
             via = Array.Empty<string>(),
             departureTime = "2026-10-08T12:00:00Z",
-            mode = "car"
         });
 
         response.EnsureSuccessStatusCode();
@@ -87,10 +85,19 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
             destination = "",
             via = Array.Empty<string>(),
             departureTime = "2026-09-24T08:30:00Z",
-            mode = "car"
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public void RouteRequest_reads_per_request_google_opt_out()
+    {
+        var request = JsonSerializer.Deserialize<RouteRequest>(
+            """{"source":"A","destination":"B","useGoogleMaps":false}""");
+
+        Assert.NotNull(request);
+        Assert.False(request!.UseGoogleMaps);
     }
 
     [Fact]
@@ -120,7 +127,6 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
                 }
             },
             departureTime = "2026-09-24T08:30:00Z",
-            mode = "car"
         });
 
         response.EnsureSuccessStatusCode();
@@ -144,7 +150,6 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
             destination = "Gothenburg",
             via = Array.Empty<string>(),
             departureTime = "2026-09-24T08:30:00Z",
-            mode = "car"
         });
 
         response.EnsureSuccessStatusCode();
@@ -175,7 +180,6 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
                 }
             },
             departureTime = "2026-09-24T08:30:00Z",
-            mode = "car"
         });
 
         response.EnsureSuccessStatusCode();

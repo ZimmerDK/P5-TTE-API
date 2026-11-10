@@ -2,13 +2,17 @@ namespace TimeEstimationAPI.Services;
 
 using TimeEstimationAPI.Models;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 
 /// <summary>Gets provider data and folds it into one route object for the model.</summary>
 public sealed class RouteDataCollector(
     IEnumerable<IRouteProvider> providers,
     ILogger<RouteDataCollector> logger,
     OsmTagEnricher osmTagEnricher,
-    TrafficContextEnricher contextEnricher)
+    TrafficContextEnricher contextEnricher,
+    IGeocodingService geocodingService,
+    IOptions<OsmOptions> osmOptions,
+    IOptions<GoogleMapsOptions> googleMapsOptions)
 {
     /// <summary>Collects route data and records which fields were not available.</summary>
     public async Task<UnifiedRoute> CollectAsync(RouteRequest request, CancellationToken cancellationToken)
@@ -18,12 +22,31 @@ public sealed class RouteDataCollector(
         var destination = request.Destination
             ?? throw new ArgumentException("Destination is required when routing from locations.");
         var providerData = new List<RouteProviderData>();
-        foreach (var provider in providers)
+        var configuredGoogleEnabled = googleMapsOptions.Value.Enabled;
+        var useGoogleMaps = request.UseGoogleMaps ?? configuredGoogleEnabled;
+        var activeProviders = providers
+            .Where(provider =>
+                provider is not GoogleRoutesService ||
+                (configuredGoogleEnabled && useGoogleMaps))
+            .ToArray();
+        logger.LogInformation(
+            "Google Maps route comparison is {Status} for this request (configured: {Configured}, request override: {RequestOverride}).",
+            useGoogleMaps ? "enabled" : "disabled",
+            configuredGoogleEnabled,
+            request.UseGoogleMaps);
+        IReadOnlyList<RoutePoint>? resolvedLocations = null;
+        var geocodingProviders = activeProviders
+            .Where(provider => provider is OsrmService or ValhallaService or GoogleRoutesService)
+            .ToArray();
+        if (geocodingProviders.Length > 1)
+            resolvedLocations = await ResolveLocationsAsync(source, destination, request.Via, cancellationToken);
+
+        foreach (var provider in activeProviders)
         {
             try
             {
                 var data = await provider.GetRouteMetadataAsync(
-                    source, destination, request.Via, cancellationToken);
+                    source, destination, request.Via, cancellationToken, resolvedLocations);
                 // OSRM supplies the route geometry; Overpass supplies the OSM tags.
                 if (provider is OsrmService)
                     data.Segments = await osmTagEnricher.EnrichAsync(data.Segments, cancellationToken);
@@ -70,7 +93,6 @@ public sealed class RouteDataCollector(
             Destination = destination,
             Via = request.Via,
             DepartureTime = request.DepartureTime,
-            Mode = request.Mode,
             DistanceMeters = primary.DistanceMeters,
             RoadType = primary.RoadType,
             SpeedLimitKmh = primary.SpeedLimitKmh,
@@ -81,6 +103,33 @@ public sealed class RouteDataCollector(
             MissingData = missingData,
             ProviderData = providerData
         };
+    }
+
+    private async Task<IReadOnlyList<RoutePoint>> ResolveLocationsAsync(
+        string source,
+        string destination,
+        IReadOnlyList<string> waypoints,
+        CancellationToken cancellationToken)
+    {
+        var locations = new List<RoutePoint>();
+        locations.Add(await geocodingService.GeocodeAsync(
+            osmOptions.Value.GeocodingUrl, source, cancellationToken));
+        foreach (var waypoint in waypoints)
+        {
+            try
+            {
+                locations.Add(await geocodingService.GeocodeAsync(
+                    osmOptions.Value.GeocodingUrl, waypoint, cancellationToken));
+            }
+            catch (InvalidOperationException)
+            {
+                throw new InvalidViaLocationException(waypoint);
+            }
+        }
+
+        locations.Add(await geocodingService.GeocodeAsync(
+            osmOptions.Value.GeocodingUrl, destination, cancellationToken));
+        return locations;
     }
 
     private static RouteProviderData ToProviderData(ProviderRouteResult data) =>

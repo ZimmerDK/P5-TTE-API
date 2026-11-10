@@ -59,7 +59,6 @@ public sealed record UnifiedRoute
 
     public IReadOnlyList<RouteSegment> Segments { get; init; } = [];
     public DateTimeOffset DepartureTime { get; init; }
-    public required string Mode { get; init; }
     public double? DistanceMeters { get; init; }
     public string? RoadType { get; init; }
     public double? SpeedLimitKmh { get; init; }

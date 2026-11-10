@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace TimeEstimationAPI.Models;
 
@@ -15,12 +16,17 @@ public sealed record RouteRequest
     [MaxLength(50)]
     public List<string> Via { get; init; } = [];
 
+    /// <summary>
+    /// Overrides the configured Google comparison setting for this request.
+    /// Set to false to guarantee that this request does not call Google Maps.
+    /// </summary>
+    [JsonPropertyName("useGoogleMaps")]
+    public bool? UseGoogleMaps { get; init; }
+
     /// <summary>Ordered road segments supplied by the caller.</summary>
     public List<RouteSegmentInput> Segments { get; init; } = [];
 
     public DateTimeOffset DepartureTime { get; init; } = DateTimeOffset.UtcNow;
-
-    public string Mode { get; init; } = "car";
 }
 
 public sealed record RouteSegmentInput

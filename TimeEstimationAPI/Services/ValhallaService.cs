@@ -27,23 +27,28 @@ public sealed class ValhallaService(
         string source,
         string destination,
         List<string>? waypoints,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<RoutePoint>? resolvedLocations = null)
     {
-        var locations = new List<(double Longitude, double Latitude)>();
-        locations.Add(await GeocodeAsync(source, cancellationToken));
-        foreach (var waypoint in waypoints ?? [])
+        var locations = resolvedLocations is not null
+            ? resolvedLocations.Select(point => (point.Longitude, point.Latitude)).ToList()
+            : [];
+        if (resolvedLocations is null)
         {
-            try
+            locations.Add(await GeocodeAsync(source, cancellationToken));
+            foreach (var waypoint in waypoints ?? [])
             {
-                locations.Add(await GeocodeAsync(waypoint, cancellationToken));
+                try
+                {
+                    locations.Add(await GeocodeAsync(waypoint, cancellationToken));
+                }
+                catch (InvalidOperationException)
+                {
+                    throw new InvalidViaLocationException(waypoint);
+                }
             }
-            catch (InvalidOperationException)
-            {
-                throw new InvalidViaLocationException(waypoint);
-            }
+            locations.Add(await GeocodeAsync(destination, cancellationToken));
         }
-
-        locations.Add(await GeocodeAsync(destination, cancellationToken));
 
         var payload = new
         {
