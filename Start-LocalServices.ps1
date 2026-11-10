@@ -3,7 +3,8 @@ param(
     [switch]$UseOsrm,
     [switch]$UseOverpass,
     [switch]$UseContext,
-    [switch]$Watch
+    [switch]$Watch,
+    [switch]$ApiOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -86,12 +87,38 @@ if ($UseContext) {
     $env:Context__Enabled = "false"
 }
 
-$pythonProcess = Start-Process `
-    -FilePath $pythonExecutable `
-    -ArgumentList $pythonArguments `
-    -WorkingDirectory $pythonDirectory `
-    -PassThru
+$stateFile = Join-Path $PSScriptRoot ".service-state.json"
+$pythonProcess = $null
+if ($ApiOnly) {
+    if (-not (Test-Path $stateFile)) {
+        throw "Cannot reload only the API because no service state was found. Start both services first."
+    }
 
+    $stateJson = Get-Content -Path $stateFile -Raw | ConvertFrom-Json
+    $pythonPid = if ($stateJson.ModelProcessId) {
+        [int]$stateJson.ModelProcessId
+    } elseif ($stateJson.Pids) {
+        [int]$stateJson.Pids[0]
+    } else {
+        0
+    }
+    if ($pythonPid -le 0) {
+        throw "Cannot reload only the API because the ML service process is unknown."
+    }
+
+    $pythonProcess = Get-Process -Id $pythonPid -ErrorAction SilentlyContinue
+    if (-not $pythonProcess) {
+        throw "Cannot reload only the API because the ML service is not running."
+    }
+} else {
+    $pythonProcess = Start-Process `
+        -FilePath $pythonExecutable `
+        -ArgumentList $pythonArguments `
+        -WorkingDirectory $pythonDirectory `
+        -PassThru
+}
+
+# Do not start or report the API as ready until the model service is ready.
 $pythonReady = $false
 for ($attempt = 1; $attempt -le 30; $attempt++) {
     if ($pythonProcess.HasExited) {
@@ -118,9 +145,9 @@ if (-not $pythonReady) {
 }
 
 $apiArguments = if ($Watch) {
-    @("watch", "run", "--project", $apiProject, "--launch-profile", "http")
+    @("watch", "run", "--no-restore", "--project", $apiProject, "--launch-profile", "http")
 } else {
-    @("run", "--project", $apiProject, "--launch-profile", "http")
+    @("run", "--no-restore", "--project", $apiProject, "--launch-profile", "http")
 }
 
 $apiProcess = Start-Process `
@@ -129,9 +156,41 @@ $apiProcess = Start-Process `
     -WorkingDirectory $PSScriptRoot `
     -PassThru
 
-$stateFile = Join-Path $PSScriptRoot ".service-state.json"
+$apiReady = $false
+for ($attempt = 1; $attempt -le 30; $attempt++) {
+    if ($apiProcess.HasExited) {
+        if (-not $ApiOnly) {
+            Stop-Process -Id $pythonProcess.Id -Force -ErrorAction SilentlyContinue
+        }
+        throw "ASP.NET API exited during startup with code $($apiProcess.ExitCode)."
+    }
+
+    try {
+        $healthResponse = Invoke-WebRequest `
+            -Uri "http://localhost:5073/health" `
+            -UseBasicParsing `
+            -TimeoutSec 2
+        if ($healthResponse.StatusCode -eq 200) {
+            $apiReady = $true
+            break
+        }
+    } catch {
+        Start-Sleep -Seconds 1
+    }
+}
+
+if (-not $apiReady) {
+    Stop-Process -Id $apiProcess.Id -Force -ErrorAction SilentlyContinue
+    if (-not $ApiOnly) {
+        Stop-Process -Id $pythonProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+    throw "ASP.NET API did not become ready at http://localhost:5073 within 30 seconds."
+}
+
 $stateData = @{
     Pids = @($pythonProcess.Id, $apiProcess.Id)
+    ModelProcessId = $pythonProcess.Id
+    ApiProcessId = $apiProcess.Id
     ModelPath = $ModelPath
     UseOsrm = [bool]$UseOsrm
     UseOverpass = [bool]$UseOverpass
@@ -173,6 +232,7 @@ Write-Host "  http://localhost:5073/health"
 Write-Host ""
 Write-Host "Reload services on command:"
 Write-Host "  .\Reload-Services.ps1"
+Write-Host "  .\Reload-Services.ps1 -ApiOnly  (restart only the ASP.NET API)"
 Write-Host ""
 Write-Host "Stop local background processes:"
 Write-Host "  .\Reload-Services.ps1 -StopOnly  (or Stop-Process -Id $($pythonProcess.Id),$($apiProcess.Id))"

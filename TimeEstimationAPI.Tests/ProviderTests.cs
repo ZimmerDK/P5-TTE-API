@@ -49,6 +49,90 @@ public sealed class ProviderTests
         Assert.Equal(2, result.Segments[0].Geometry.Count);
     }
 
+    [Fact]
+    public async Task OsrmService_includes_ordered_via_points_in_route_request()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            return JsonResponse("""
+            {
+              "routes": [{
+                "distance": 300, "duration": 60,
+                "legs": [{"steps": []}, {"steps": []}]
+              }]
+            }
+            """);
+        }));
+        var service = new OsrmService(
+            httpClient,
+            Options.Create(new OsmOptions { RoutingUrl = "https://osrm.test/route/v1/driving" }),
+            new MappingGeocodingService(new Dictionary<string, RoutePoint>
+            {
+                ["source"] = new(10, 55),
+                ["via-1"] = new(10.1, 55.1),
+                ["via-2"] = new(10.2, 55.2),
+                ["destination"] = new(10.3, 55.3)
+            }));
+
+        await service.GetRouteMetadataAsync(
+            "source", "destination", ["via-1", "via-2"]);
+
+        Assert.NotNull(capturedRequest);
+        Assert.Contains(
+            "/10,55;10.1,55.1;10.2,55.2;10.3,55.3?",
+            capturedRequest!.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task GeocodingService_skips_empty_results_without_json_element_error()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            JsonResponse("[]")));
+        var service = new GeocodingService(
+            httpClient,
+            NullLogger<GeocodingService>.Instance);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.GeocodeAsync(
+                "https://nominatim.test/search",
+                "unknown place"));
+
+        Assert.Contains("unknown place", exception.Message);
+    }
+
+    [Fact]
+    public async Task GeocodingService_reads_numeric_coordinates()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            JsonResponse("""[{"lon":10.1,"lat":55.2}]""")));
+        var service = new GeocodingService(
+            httpClient,
+            NullLogger<GeocodingService>.Instance);
+
+        var point = await service.GeocodeAsync(
+            "https://nominatim.test/search",
+            "numeric place");
+
+        Assert.Equal(new RoutePoint(10.1, 55.2), point);
+    }
+
+    [Fact]
+    public async Task OsrmService_reports_invalid_non_empty_via_location()
+    {
+        var service = new OsrmService(
+            new HttpClient(new StubHttpMessageHandler(_ =>
+                throw new InvalidOperationException("The route request should not be sent."))),
+            Options.Create(new OsmOptions { RoutingUrl = "https://osrm.test/route/v1/driving" }),
+            new FailingGeocodingService("bad via"));
+
+        var exception = await Assert.ThrowsAsync<InvalidViaLocationException>(
+            () => service.GetRouteMetadataAsync("source", "destination", ["bad via"]));
+
+        Assert.Contains("bad via", exception.Message);
+    }
+
     // Checks that useful road details from Overpass get applied to the right segment.
     [Fact]
     public async Task OsmTagEnricher_applies_matching_way_tags()
@@ -147,6 +231,31 @@ public sealed class ProviderTests
             Task.FromResult(query == "A"
                 ? new RoutePoint(10, 55)
                 : new RoutePoint(10.002, 55.002));
+
+        public IReadOnlyList<string> GenerateCandidateQueries(string rawQuery) => [rawQuery];
+    }
+
+    private sealed class MappingGeocodingService(
+        IReadOnlyDictionary<string, RoutePoint> points) : IGeocodingService
+    {
+        public Task<RoutePoint> GeocodeAsync(
+            string geocodingUrl,
+            string query,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(points[query]);
+
+        public IReadOnlyList<string> GenerateCandidateQueries(string rawQuery) => [rawQuery];
+    }
+
+    private sealed class FailingGeocodingService(string failingQuery) : IGeocodingService
+    {
+        public Task<RoutePoint> GeocodeAsync(
+            string geocodingUrl,
+            string query,
+            CancellationToken cancellationToken = default) =>
+            query == failingQuery
+                ? throw new InvalidOperationException("Location could not be geocoded.")
+                : Task.FromResult(new RoutePoint(10, 55));
 
         public IReadOnlyList<string> GenerateCandidateQueries(string rawQuery) => [rawQuery];
     }

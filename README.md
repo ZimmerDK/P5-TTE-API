@@ -22,9 +22,16 @@ Run the launcher script to start both the Python ML service and the ASP.NET Core
 # Hot reload services on command when code updated:
 .\Reload-Services.ps1
 
+# Restart only the ASP.NET Core API while keeping the ML service running:
+.\Reload-Services.ps1 -ApiOnly
+
 # Stop local services when done:
 .\Reload-Services.ps1 -StopOnly
 ```
+
+Launcher waits for the Python model service to be read/"healthy" before starting the ASP.NET Core API. 
+Use `-ApiOnly` when you made changes to only the C# code, so that the ML service doesn't reload. 
+The launcher also uses `--no-restore` for local reloads; run `dotnet restore` after changing project dependencies.
 
 - **ASP.NET Core API**: `http://localhost:5073`
 - **Python ML Service**: `http://127.0.0.1:8001`

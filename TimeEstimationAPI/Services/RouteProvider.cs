@@ -29,3 +29,6 @@ public sealed class ProviderRouteResult
 
 public sealed class RouteProviderUnavailableException(string message)
     : Exception(message);
+
+public sealed class InvalidViaLocationException(string location)
+    : ArgumentException($"The via location '{location}' could not be geocoded. Provide a valid address or coordinate.");

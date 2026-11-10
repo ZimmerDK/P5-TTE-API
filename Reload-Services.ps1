@@ -1,5 +1,6 @@
 param(
-    [switch]$StopOnly
+    [switch]$StopOnly,
+    [switch]$ApiOnly
 )
 
 $ErrorActionPreference = "SilentlyContinue"
@@ -9,13 +10,26 @@ $stateFile = Join-Path $PSScriptRoot ".service-state.json"
 if (Test-Path $stateFile) {
     try {
         $stateJson = Get-Content -Path $stateFile -Raw | ConvertFrom-Json
-        if ($stateJson.Pids) {
-            foreach ($pidToStop in $stateJson.Pids) {
-                Stop-Process -Id $pidToStop -Force -ErrorAction SilentlyContinue
+        $pidsToStop = if ($ApiOnly) {
+            if ($stateJson.ApiProcessId) {
+                @([int]$stateJson.ApiProcessId)
+            } elseif ($stateJson.Pids -and $stateJson.Pids.Count -gt 1) {
+                @([int]$stateJson.Pids[1])
+            } else {
+                @()
             }
+        } elseif ($stateJson.Pids) {
+            @($stateJson.Pids | ForEach-Object { [int]$_ })
+        } else {
+            @()
+        }
+        foreach ($pidToStop in $pidsToStop) {
+            Stop-Process -Id $pidToStop -Force -ErrorAction SilentlyContinue
         }
     } catch {
-        # Ignore read errors
+        if ($ApiOnly) {
+            throw
+        }
     }
 }
 
@@ -40,4 +54,7 @@ if (Test-Path $stateFile) {
 }
 
 $startScript = Join-Path $PSScriptRoot "Start-LocalServices.ps1"
+if ($ApiOnly) {
+    $params["ApiOnly"] = $true
+}
 & $startScript @params

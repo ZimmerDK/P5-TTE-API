@@ -85,6 +85,7 @@ if (app.Environment.IsDevelopment())
 // Main route estimate endpoint: collect data, run the model, return the estimate and route used.
 app.MapPost("/api/routes/estimate", async (RouteRequest request, ModelService modelService, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
+    request = request with { Via = (request.Via ?? []).Where(value => !string.IsNullOrWhiteSpace(value)).ToList() };
     if (request.Segments.Count == 0 &&
         (string.IsNullOrWhiteSpace(request.Source) || string.IsNullOrWhiteSpace(request.Destination)))
     {
@@ -93,12 +94,6 @@ app.MapPost("/api/routes/estimate", async (RouteRequest request, ModelService mo
             ["route"] = ["Provide segments, or provide both source and destination."]
         });
     }
-    if (request.Via.Any(string.IsNullOrWhiteSpace))
-        return Results.ValidationProblem(new Dictionary<string, string[]>
-        {
-            ["via"] = ["Via locations must not be empty."]
-        });
-
     var startedAt = Stopwatch.GetTimestamp();
     var result = await modelService.EstimateAsync(request, cancellationToken);
     logger.LogInformation("Estimated route with {SegmentCount} segments in {ElapsedMilliseconds} ms.",
@@ -119,19 +114,12 @@ app.MapPost("/api/routes/provider-data", async (
     RouteDataCollector routeDataCollector,
     CancellationToken cancellationToken) =>
 {
+    request = request with { Via = (request.Via ?? []).Where(value => !string.IsNullOrWhiteSpace(value)).ToList() };
     if (string.IsNullOrWhiteSpace(request.Source) || string.IsNullOrWhiteSpace(request.Destination))
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
             ["route"] = ["Provide both source and destination for provider data."]
-        });
-    }
-
-    if (request.Via.Any(string.IsNullOrWhiteSpace))
-    {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
-        {
-            ["via"] = ["Via locations must not be empty."]
         });
     }
 
@@ -151,13 +139,7 @@ app.MapPost("/api/routes/model-only", async (
     ModelService modelService,
     CancellationToken cancellationToken) =>
 {
-    if (request.Via.Any(string.IsNullOrWhiteSpace))
-    {
-        return Results.ValidationProblem(new Dictionary<string, string[]>
-        {
-            ["via"] = ["Via locations must not be empty."]
-        });
-    }
+    request = request with { Via = (request.Via ?? []).Where(value => !string.IsNullOrWhiteSpace(value)).ToList() };
 
     var result = await modelService.EstimateSegmentsAsync(request, cancellationToken);
     return Results.Ok(result);

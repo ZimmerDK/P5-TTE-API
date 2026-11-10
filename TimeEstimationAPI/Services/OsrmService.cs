@@ -32,8 +32,20 @@ public sealed class OsrmService(
         CancellationToken cancellationToken = default)
     {
         var locations = new List<RoutePoint>();
-        foreach (var location in new[] { source }.Concat(waypoints ?? []).Concat(new[] { destination }))
-            locations.Add(await GeocodeAsync(location, cancellationToken));
+        locations.Add(await GeocodeAsync(source, cancellationToken));
+        foreach (var waypoint in waypoints ?? [])
+        {
+            try
+            {
+                locations.Add(await GeocodeAsync(waypoint, cancellationToken));
+            }
+            catch (InvalidOperationException)
+            {
+                throw new InvalidViaLocationException(waypoint);
+            }
+        }
+
+        locations.Add(await GeocodeAsync(destination, cancellationToken));
 
         var coordinates = string.Join(';', locations.Select(point =>
             $"{point.Longitude.ToString(CultureInfo.InvariantCulture)},{point.Latitude.ToString(CultureInfo.InvariantCulture)}"));

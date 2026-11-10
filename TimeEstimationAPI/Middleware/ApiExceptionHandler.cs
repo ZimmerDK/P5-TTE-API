@@ -15,6 +15,7 @@ internal sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) :
     {
         var (statusCode, title, detail) = exception switch
         {
+            InvalidViaLocationException => (StatusCodes.Status400BadRequest, "Invalid 'via' location", exception.Message),
             ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request", exception.Message),
             ModelServiceUnavailableException => (StatusCodes.Status502BadGateway, "Model service unavailable", "The Python model service could not be reached or returned an invalid response."),
             RouteProviderUnavailableException => (StatusCodes.Status502BadGateway, "Route provider unavailable", "No configured route provider returned usable data."),

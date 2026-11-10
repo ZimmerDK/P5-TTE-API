@@ -210,10 +210,9 @@ public sealed class GeocodingService(
             var results = await response.Content.ReadFromJsonAsync<JsonElement[]>(cancellationToken: cancellationToken);
             var first = results?.FirstOrDefault();
             if (first.HasValue &&
-                first.Value.TryGetProperty("lon", out var lonProp) &&
-                first.Value.TryGetProperty("lat", out var latProp) &&
-                double.TryParse(lonProp.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var lon) &&
-                double.TryParse(latProp.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var lat))
+                first.Value.ValueKind == JsonValueKind.Object &&
+                TryReadCoordinate(first.Value, "lon", out var lon) &&
+                TryReadCoordinate(first.Value, "lat", out var lat))
             {
                 return new RoutePoint(lon, lat);
             }
@@ -236,5 +235,25 @@ public sealed class GeocodingService(
         }
 
         return null;
+    }
+
+    private static bool TryReadCoordinate(
+        JsonElement element,
+        string propertyName,
+        out double coordinate)
+    {
+        coordinate = 0;
+        if (!element.TryGetProperty(propertyName, out var property))
+            return false;
+
+        if (property.ValueKind == JsonValueKind.Number)
+            return property.TryGetDouble(out coordinate);
+
+        return property.ValueKind == JsonValueKind.String &&
+            double.TryParse(
+                property.GetString(),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out coordinate);
     }
 }
