@@ -5,9 +5,15 @@ using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Pretty-print JSON when enabled in config.
+var prettyPrintJson = builder.Configuration.GetValue("Api:PrettyPrintJson", true);
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.WriteIndented = prettyPrintJson);
+
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddMemoryCache();
 builder.Services.Configure<RouteModelOptions>(builder.Configuration.GetSection("Model"));
 builder.Services.Configure<OsmOptions>(builder.Configuration.GetSection("Osm"));
 builder.Services.Configure<ValhallaOptions>(builder.Configuration.GetSection("Valhalla"));
@@ -36,7 +42,7 @@ builder.Services.AddHttpClient<GoogleRoutesService>(client =>
 
 builder.Services.AddHttpClient<OsmTagEnricher>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(5);
+    client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TimeEstimationAPI/1.0 (development)");
 });
 

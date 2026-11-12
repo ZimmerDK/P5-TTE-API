@@ -32,7 +32,8 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         var response = await _client.GetAsync("/health");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("{\"status\":\"ok\"}", await response.Content.ReadAsStringAsync());
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("ok", document.RootElement.GetProperty("status").GetString());
     }
 
     [Fact]

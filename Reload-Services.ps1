@@ -1,6 +1,12 @@
 param(
     [switch]$StopOnly,
-    [switch]$ApiOnly
+    [switch]$ApiOnly,
+    [switch]$UseOsrm,
+    [switch]$UseOverpass,
+    [switch]$UseContext,
+    [switch]$UseGoogle,
+    [switch]$Watch,
+    [string]$ModelPath
 )
 
 $ErrorActionPreference = "SilentlyContinue"
@@ -44,18 +50,29 @@ if ($StopOnly) {
 Write-Host "Reloading services on demand..."
 
 $params = @{}
+if ($PSBoundParameters.ContainsKey("ModelPath")) {
+    $params["ModelPath"] = $ModelPath
+}
+foreach ($flagName in @("UseOsrm", "UseOverpass", "UseContext", "UseGoogle", "Watch")) {
+    if ($PSBoundParameters.ContainsKey($flagName)) {
+        $params[$flagName] = [bool]$PSBoundParameters[$flagName]
+    }
+}
 if (Test-Path $stateFile) {
     $stateJson = Get-Content -Path $stateFile -Raw | ConvertFrom-Json
-    if ($stateJson.ModelPath) { $params["ModelPath"] = $stateJson.ModelPath }
-    if ($stateJson.UseOsrm) { $params["UseOsrm"] = $true }
-    if ($stateJson.UseOverpass) { $params["UseOverpass"] = $true }
-    if ($stateJson.UseContext) { $params["UseContext"] = $true }
-    if ($stateJson.UseGoogle) {
-        $params["UseGoogle"] = $true
-    } elseif ($stateJson.UseGoogleMaps) {
-        $params["UseGoogle"] = $true
+    if (-not $PSBoundParameters.ContainsKey("ModelPath") -and $stateJson.ModelPath) {
+        $params["ModelPath"] = $stateJson.ModelPath
     }
-    if ($stateJson.Watch) { $params["Watch"] = $true }
+
+    foreach ($flagName in @("UseOsrm", "UseOverpass", "UseContext", "UseGoogle", "Watch")) {
+        if ($PSBoundParameters.ContainsKey($flagName)) {
+            continue
+        } elseif ($flagName -eq "UseGoogle" -and $stateJson.UseGoogleMaps) {
+            $params[$flagName] = $true
+        } elseif ($stateJson.$flagName) {
+            $params[$flagName] = $true
+        }
+    }
 }
 
 $startScript = Join-Path $PSScriptRoot "Start-LocalServices.ps1"

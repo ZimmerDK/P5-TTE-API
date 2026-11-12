@@ -215,6 +215,9 @@ if ($Watch) {
     Write-Host "Auto-reload on save is DISABLED (default)."
     Write-Host "To hot-reload services on demand when ready, run: .\Reload-Services.ps1"
 }
+Write-Host ""
+Write-Host "Model file in use: $resolvedModelPath"
+Write-Host ""
 if ($UseOsrm) {
     Write-Host "OSRM/Nominatim routing is enabled."
 }
@@ -235,15 +238,12 @@ if ($UseGoogle) {
 }
 Write-Host ""
 Write-Host "Health checks:"
-Write-Host "  http://127.0.0.1:8001/health"
+Write-Host "  http://127.0.0.1:8001/health (Python model service)  OR  http://localhost:5073/health (ASP.NET API)"
 if ($UseContext) {
-    Write-Host "  http://localhost:8010/health"
+    Write-Host "  http://localhost:8010/health (Context service)"
 }
-Write-Host "  http://localhost:5073/health"
 Write-Host ""
-Write-Host "Reload services on command:"
-Write-Host "  .\Reload-Services.ps1"
-Write-Host "  .\Reload-Services.ps1 -ApiOnly  (restart only the ASP.NET API)"
-Write-Host ""
+Write-Host "Reload services on command (supports -UseXXX:$true and -UseXXX:$false):"
+Write-Host "  .\Reload-Services.ps1  OR  .\Reload-Services.ps1 -ApiOnly  (restart only the ASP.NET API)"
 Write-Host "Stop local background processes:"
 Write-Host "  .\Reload-Services.ps1 -StopOnly  (or Stop-Process -Id $($pythonProcess.Id),$($apiProcess.Id))"

@@ -56,7 +56,9 @@ Google is an additional comparison provider and does not replace OSRM. Response 
 ```
 When `useGoogleMaps` is omitted, the launcher/configuration default is used. Setting it to `false` guarantees that request will not call Google.
 
-For subsequent changes, `.\Reload-Services.ps1` preserves these switches. Use `.\Reload-Services.ps1 -ApiOnly` for C# changes without restarting the ML service.
+For subsequent changes, `.\Reload-Services.ps1` preserves the flags. 
+Use `.\Reload-Services.ps1 -ApiOnly` for C# changes without restarting the ML service.
+You can override the flags when reloading, e.g. `.\Reload-Services.ps1 -UseContext -UseOverpass`. Use `-UseContext:$false` or `-UseOverpass:$false` to disable a previously enabled flag. 
 
 Each user must use their own Google Cloud / Google Maps Platform API key. 
 Google Cloud billing and API quotas are controlled by Google Cloud, not by this API. Enable only the Routes API, restrict the key to the Routes API and your server environment, and configure a budget/quota alert. A budget alert does NOT mean a hard spending cap, so do not enable Google if you require an absolute guarantee of zero billing.

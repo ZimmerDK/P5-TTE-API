@@ -24,7 +24,7 @@ Supported model settings include `DecisionTreeRegressor`, `LinearRegression`, `R
 .\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8001
 ```
 
-The service will run at `http://127.0.0.1:8001`.
+The ML service will run at `http://127.0.0.1:8001`.
 
 ---
 

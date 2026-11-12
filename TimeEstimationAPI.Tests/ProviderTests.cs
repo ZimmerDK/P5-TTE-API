@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using TimeEstimationAPI.Models;
@@ -195,8 +196,13 @@ public sealed class ProviderTests
     [Fact]
     public async Task OsmTagEnricher_applies_matching_way_tags()
     {
-        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
-            JsonResponse("""
+        HttpRequestMessage? capturedRequest = null;
+        string? capturedQuery = null;
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            capturedQuery = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+            return JsonResponse("""
             {
               "elements": [{
                 "type": "way",
@@ -208,16 +214,19 @@ public sealed class ProviderTests
                 }
               }]
             }
-            """)));
+            """);
+        }));
         var service = new OsmTagEnricher(
             httpClient,
             Options.Create(new OsmOptions
             {
                 UseOverpass = true,
                 OverpassUrl = "https://overpass.test/api/interpreter",
-                FallbackOverpassUrl = string.Empty
+                FallbackOverpassUrl = string.Empty,
+                OverpassApiKey = "test-key"
             }),
-            NullLogger<OsmTagEnricher>.Instance);
+            NullLogger<OsmTagEnricher>.Instance,
+            new MemoryCache(Options.Create(new MemoryCacheOptions())));
 
         var result = await service.EnrichAsync(
         [
@@ -240,6 +249,10 @@ public sealed class ProviderTests
         Assert.Equal(80, segment.SpeedLimitKmh);
         Assert.Equal(2, segment.LaneCount);
         Assert.True(segment.IsBridge);
+        Assert.NotNull(capturedRequest);
+        Assert.Equal("https://api.overpass.ch/v1/interpreter", capturedRequest!.RequestUri!.ToString());
+        Assert.Equal("test-key", capturedRequest.Headers.GetValues("X-API-Key").Single());
+        Assert.Contains("(around:50", WebUtility.UrlDecode(capturedQuery));
     }
 
     // Long provider segments should get split up, while their total time and length stay the same.

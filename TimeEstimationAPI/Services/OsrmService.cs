@@ -14,6 +14,7 @@ public sealed class OsmOptions
     public string RoutingUrl { get; set; } = "https://router.project-osrm.org/route/v1/driving";
     public string OverpassUrl { get; set; } = "https://overpass.kumi.systems/api/interpreter";
     public string FallbackOverpassUrl { get; set; } = "https://overpass-api.de/api/interpreter";
+    public string OverpassApiKey { get; set; } = string.Empty;
 }
 
 /// <summary>Geocodes stops, asks OSRM for route steps, then maps them to segments.</summary>
