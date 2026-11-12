@@ -3,17 +3,12 @@ param(
     [switch]$UseOsrm,
     [switch]$UseOverpass,
     [switch]$UseContext,
-    [switch]$UseGoogleMaps,
-    [switch]$UseGoogleEnrich,
+    [switch]$UseGoogle,
     [switch]$Watch,
     [switch]$ApiOnly
 )
 
 $ErrorActionPreference = "Stop"
-
-if ($UseGoogleEnrich -and -not $UseGoogleMaps) {
-    throw "UseGoogleEnrich requires UseGoogleMaps because enrichment is an optional Google Routes request."
-}
 
 $pythonDirectory = Join-Path $PSScriptRoot "ml-service"
 $pythonExecutable = Join-Path $pythonDirectory ".venv\Scripts\python.exe"
@@ -81,6 +76,8 @@ $env:MODEL_PATH = $resolvedModelPath
 $env:Model__PythonServiceUrl = "http://127.0.0.1:8001"
 if ($UseOsrm) {
     $env:Osm__UseOsrm = "true"
+} else {
+    $env:Osm__UseOsrm = "false"
 }
 if ($UseOverpass) {
     $env:Osm__UseOverpass = "true"
@@ -92,17 +89,11 @@ if ($UseContext) {
 } else {
     $env:Context__Enabled = "false"
 }
-if ($UseGoogleMaps) {
+if ($UseGoogle) {
     $env:GoogleMaps__Enabled = "true"
 } else {
     $env:GoogleMaps__Enabled = "false"
 }
-if ($UseGoogleEnrich) {
-    $env:GoogleMaps__EnrichmentEnabled = "true"
-} else {
-    $env:GoogleMaps__EnrichmentEnabled = "false"
-}
-
 $stateFile = Join-Path $PSScriptRoot ".service-state.json"
 $pythonProcess = $null
 if ($ApiOnly) {
@@ -211,8 +202,7 @@ $stateData = @{
     UseOsrm = [bool]$UseOsrm
     UseOverpass = [bool]$UseOverpass
     UseContext = [bool]$UseContext
-    UseGoogleMaps = [bool]$UseGoogleMaps
-    UseGoogleEnrich = [bool]$UseGoogleEnrich
+    UseGoogle = [bool]$UseGoogle
     Watch = [bool]$Watch
 }
 $stateData | ConvertTo-Json | Set-Content -Path $stateFile -Force
@@ -235,20 +225,13 @@ if ($UseOverpass) {
 }
 if ($UseContext) {
     Write-Host "Spatial context density enrichment is enabled (Context__Enabled = true)."
-    Write-Host "Note: Spatial context service must be started manually if needed (e.g., via Docker):"
-    Write-Host "  cd C:\Dev\spatial-context-service.v2; docker compose up -d --build"
 } else {
     Write-Host "Spatial context density enrichment is disabled."
 }
-if ($UseGoogleMaps) {
+if ($UseGoogle) {
     Write-Host "Google Routes comparison is enabled."
 } else {
     Write-Host "Google Routes comparison is disabled."
-}
-if ($UseGoogleEnrich) {
-    Write-Host "Google Routes enrichment is enabled."
-} else {
-    Write-Host "Google Routes enrichment is disabled."
 }
 Write-Host ""
 Write-Host "Health checks:"

@@ -36,6 +36,7 @@ public sealed record RouteProviderData
     public required string Provider { get; init; }
     public double? DistanceMeters { get; init; }
     public double? ProviderRouteTimeSeconds { get; init; }
+    public double? StaticRouteTimeSeconds { get; init; }
     public string? RoadType { get; init; }
     public double? SpeedLimitKmh { get; init; }
     public int? TrafficSignalCount { get; init; }

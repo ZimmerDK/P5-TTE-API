@@ -102,7 +102,16 @@ public sealed class GeocodingService(
         if (hasUnitParts && inlineUnitParts.Count > 0) candidates.Add(string.Join(", ", inlineUnitParts));
         if (hasUnitParts && nonUnitParts.Count > 0) candidates.Add(string.Join(", ", nonUnitParts));
 
-        // 3. Queries without trailing country/region component (if >= 2 parts)
+        // 3. Drop leading POI/venue name before removing locality components.
+        // This preserves the street and postal locality for addresses such as
+        // "Circle K, Hadsundvej 212, 9220 Aalborg".
+        if (parts.Length >= 3)
+        {
+            candidates.Add(string.Join(", ", parts.Skip(1)));
+            if (nonUnitParts.Count >= 3) candidates.Add(string.Join(", ", nonUnitParts.Skip(1)));
+        }
+
+        // 4. Queries without trailing country/region component (if >= 2 parts)
         if (parts.Length >= 2)
         {
             candidates.Add(string.Join(", ", parts.SkipLast(1)));
@@ -123,12 +132,9 @@ public sealed class GeocodingService(
             }
         }
 
-        // 6. Drop leading part (e.g. drop POI/venue name if multiple parts present) (e.g. "Salling Aarhus, Søndergade 27, 8000 Aarhus" -> "Søndergade 27, 8000 Aarhus")
+        // 6. Try POI name + city/zip (first part + last part before country) (e.g. "Salling Aarhus, 8000 Aarhus, Denmark" -> "Salling Aarhus, 8000 Aarhus")
         if (parts.Length >= 3)
         {
-            candidates.Add(string.Join(", ", parts.Skip(1)));
-            if (nonUnitParts.Count >= 3) candidates.Add(string.Join(", ", nonUnitParts.Skip(1)));
-            // 7. Try POI name + city/zip (first part + last part before country) (e.g. "Salling Aarhus, 8000 Aarhus")
             var lastLocality = parts.Length >= 4 ? parts[^2] : parts[^1];
             candidates.Add($"{parts[0]}, {lastLocality}");
         }

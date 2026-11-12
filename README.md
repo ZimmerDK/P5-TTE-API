@@ -34,29 +34,19 @@ Use `-ApiOnly` when you made changes to only the C# code, so that the ML service
 The launcher also uses `--no-restore` for local reloads; run `dotnet restore` after changing project dependencies.
 
 ### Optional Google Routes comparison
-Google integration is disabled by default. Do not paste the API key into chat,
-source code, `appsettings.json`, Postman, or a committed file. Put it only in
-the ignored local `ml-service\.env` file:
+Google Maps integration is disabled by default. 
+Do not paste the API key into chat, source code, `appsettings.json`, Postman, or a committed file. Put it only in the ignored local `ml-service\.env` file:
 ```powershell
 GoogleMaps__ApiKey=your-key
 ```
 
 Then enable it explicitly with the launcher:
 ```powershell
-.\Start-LocalServices.ps1 -UseOsrm -UseGoogleMaps
+.\Start-LocalServices.ps1 -UseOsrm -UseGoogle
 ```
 
-The API uses existing OSM/Nominatim geocoding and sends only the resulting
-coordinates to Google's Routes API. Google is an additional comparison
-provider; it does not replace OSRM. The response includes optional
-`googleComparison` route and segment metrics when enabled. Leave
-`-UseGoogleMaps` out to make no Google requests. Add `-UseGoogleEnrich` to
-request the additional Google route-step fields as well:
-```powershell
-.\Start-LocalServices.ps1 -UseOsrm -UseGoogleMaps -UseGoogleEnrich
-```
-
-Individual requests can opt out even when Google is enabled globally:
+The API uses existing OSM/Nominatim geocoding and sends those coordinates to Google's Routes API. 
+Google is an additional comparison provider and does not replace OSRM. Response includes optional `googleComparison` metrics for whole route and each segment, including Google's no-traffic route duration. Leave `-UseGoogle` out to make no Google requests, or change the `UseGoogleMaps` value in individual json request body to `false` to opt out even when Google Maps Routes API is enabled globally:
 ```json
 {
   "source": "Aalborg Station, Denmark",
@@ -64,29 +54,17 @@ Individual requests can opt out even when Google is enabled globally:
   "useGoogleMaps": false
 }
 ```
-When `useGoogleMaps` is omitted, the launcher/configuration default is used.
-Setting it to `false` guarantees that request will not call Google.
+When `useGoogleMaps` is omitted, the launcher/configuration default is used. Setting it to `false` guarantees that request will not call Google.
 
-For subsequent changes, `.\Reload-Services.ps1` preserves these switches.
-Use `.\Reload-Services.ps1 -ApiOnly` for C# changes without restarting the ML
-service.
+For subsequent changes, `.\Reload-Services.ps1` preserves these switches. Use `.\Reload-Services.ps1 -ApiOnly` for C# changes without restarting the ML service.
 
-Google Cloud billing and API quotas are controlled by Google Cloud, not by this
-API. Enable only the Routes API, restrict the key to the Routes API and your
-server environment, and configure a budget/quota alert. A budget alert is not
-a hard spending cap, so do not enable Google if you require an absolute
-guarantee of zero billing.
+Each user must use their own Google Cloud / Google Maps Platform API key. 
+Google Cloud billing and API quotas are controlled by Google Cloud, not by this API. Enable only the Routes API, restrict the key to the Routes API and your server environment, and configure a budget/quota alert. A budget alert does NOT mean a hard spending cap, so do not enable Google if you require an absolute guarantee of zero billing.
 
-Comparison deltas use `Google - comparison`: positive means Google estimated
-more seconds, while negative means Google estimated fewer seconds.
+Comparison deltas use `Google – comparison`: positive means Google estimated more seconds, while negative means Google estimated fewer seconds.
 
 - **ASP.NET Core API**: `http://localhost:5073`
 - **Python ML Service**: `http://127.0.0.1:8001`
-- **Spatial Context Service** (manually run if needed, e.g., on via Docker):
-  ```powershell
-  cd C:\Dev\spatial-context-service.v2
-  docker compose up -d --build
-  ```
 
 #### Option B: MANUAL | Run Individually in VS Code Terminals
 1. **ASP.NET Core API**:
@@ -96,11 +74,6 @@ more seconds, while negative means Google estimated fewer seconds.
 2. **Python ML Service**:
    ```powershell
    .\ml-service\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8001
-   ```
-3. **Spatial Context Service (Docker)**:
-   ```powershell
-   cd C:\Dev\spatial-context-service.v2
-   docker compose up -d --build
    ```
 
 Use the Postman collection in `postman/` or `TimeEstimationAPI/TimeEstimationAPI.http` to send test requests.

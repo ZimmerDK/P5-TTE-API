@@ -10,7 +10,6 @@ namespace TimeEstimationAPI.Services;
 public sealed class GoogleMapsOptions
 {
     public bool Enabled { get; set; }
-    public bool EnrichmentEnabled { get; set; }
     public string ApiKey { get; set; } = string.Empty;
     public string RoutesUrl { get; set; } = "https://routes.googleapis.com/directions/v2:computeRoutes";
 }
@@ -23,10 +22,8 @@ public sealed class GoogleRoutesService(
     IGeocodingService geocodingService) : IRouteProvider
 {
     private const string FieldMask =
-        "routes.distanceMeters,routes.duration,routes.legs.distanceMeters,routes.legs.duration";
-    private const string EnrichmentFieldMask =
-        FieldMask + ",routes.legs.steps.distanceMeters,routes.legs.steps.duration," +
-        "routes.legs.steps.navigationInstruction,routes.legs.steps.travelAdvisory";
+        "routes.distanceMeters,routes.duration,routes.staticDuration," +
+        "routes.legs.distanceMeters,routes.legs.duration";
 
     private readonly GoogleMapsOptions _options = options.Value;
     private readonly OsmOptions _osmOptions = osmOptions.Value;
@@ -80,10 +77,16 @@ public sealed class GoogleRoutesService(
         request.Headers.Add("X-Goog-Api-Key", _options.ApiKey);
         request.Headers.Add(
             "X-Goog-FieldMask",
-            _options.EnrichmentEnabled ? EnrichmentFieldMask : FieldMask);
+            FieldMask);
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new HttpRequestException(
+                $"Google Routes API returned {(int)response.StatusCode} ({response.ReasonPhrase}): {errorBody}");
+        }
+
         using var document = await JsonDocument.ParseAsync(
             await response.Content.ReadAsStreamAsync(cancellationToken),
             cancellationToken: cancellationToken);
@@ -101,6 +104,7 @@ public sealed class GoogleRoutesService(
             Provider = Name,
             DistanceMeters = route.GetProperty("distanceMeters").GetDouble(),
             ProviderRouteTimeSeconds = ParseDuration(route.GetProperty("duration")),
+            StaticRouteTimeSeconds = ParseDuration(route.GetProperty("staticDuration")),
             MissingFields = ["roadType", "speedLimitKmh", "laneCount"],
             Segments = segments
         };

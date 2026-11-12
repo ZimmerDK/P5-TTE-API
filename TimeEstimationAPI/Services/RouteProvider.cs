@@ -20,6 +20,7 @@ public sealed class ProviderRouteResult
     public string Provider { get; set; } = "OSRM";
     public double? DistanceMeters { get; set; }
     public double? ProviderRouteTimeSeconds { get; set; }
+    public double? StaticRouteTimeSeconds { get; set; }
     public string? RoadType { get; set; }
     public double? SpeedLimitKmh { get; set; }
     public int? TrafficSignalCount { get; set; }

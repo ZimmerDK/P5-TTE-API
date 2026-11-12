@@ -22,19 +22,18 @@ dotnet test ..\TimeEstimationAPI.Tests\TimeEstimationAPI.Tests.csproj
 ---
 
 ## Configuration Options
-Settings can be configured in `appsettings.json` or via environment variables:
+Settings can be configured in `appsettings.json` or via `.env` variables (see ml-service readme):
 
 - **Model Backend**:
   - `Model:PythonServiceUrl`: URL of the Python ML service that receives segment feature vectors (`http://127.0.0.1:8001` by default).
 - **Route Providers**:
   - `Osm:UseOsrm`: Set to `true` to use live public OSRM and Nominatim endpoints for routing and geocoding.
   - `Osm:UseOverpass`: Set to `true` to enrich OSRM segments with road tags (speed limits, lanes, bridge/tunnel) from Overpass (rarely works tbh).
-  - `Context:Enabled`: Set to `true` to enrich route segments with spatial density context (road density, population density, built volume density) from the Context microservice.
-  - `Context:BaseUrl`: Context service base URL, for example `http://130.225.39.125:8010/`.
+  - `Context:Enabled`: Set to `true` to enrich route segments with spatial density context (road density, population density, built volume density) from the Context microservice. The launcher controls this with `-UseContext`.
+  - `Context:BaseUrl`: Context service base URL. The shared default is in `appsettings.json`; override it in `ml-service\.env` for a different server.
   - `Context:ApiKey`: Optional API key sent as the `X-API-Key` header. Store it in the ignored `ml-service\.env` file, not in tracked configuration.
   - `Valhalla:Enabled`: Set to `true` to use a local Valhalla routing server if available (TBD — Doesn't work at all yet).
-  - `GoogleMaps:Enabled`: Set to `true` to make an additional Google Routes API comparison call. Disabled by default.
-  - `GoogleMaps:EnrichmentEnabled`: Set to `true` to request additional Google route-step fields. Disabled by default.
+  - `GoogleMaps:Enabled`: Set to `true` to make a Google Routes API comparison call with traffic-aware and no-traffic route durations. Disabled by default.
   - `GoogleMaps:ApiKey`: Server-side Google API key, supplied through the ignored `ml-service\.env` file as `GoogleMaps__ApiKey` or through user secrets.
   - `GoogleMaps:RoutesUrl`: Google Routes API endpoint. The default is `https://routes.googleapis.com/directions/v2:computeRoutes`.
 

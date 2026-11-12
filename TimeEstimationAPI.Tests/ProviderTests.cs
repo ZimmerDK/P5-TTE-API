@@ -147,6 +147,7 @@ public sealed class ProviderTests
               "routes": [{
                 "distanceMeters": 1200,
                 "duration": "90s",
+                "staticDuration": "80s",
                 "legs": [
                   {"distanceMeters": 500, "duration": "40s"},
                   {"distanceMeters": 700, "duration": "50s"}
@@ -177,9 +178,14 @@ public sealed class ProviderTests
 
         Assert.Equal(1200, result.DistanceMeters);
         Assert.Equal(90, result.ProviderRouteTimeSeconds);
+        Assert.Equal(80, result.StaticRouteTimeSeconds);
         Assert.Equal(2, result.Segments.Count);
         Assert.NotNull(capturedRequest);
         Assert.Equal("test-key", capturedRequest!.Headers.GetValues("X-Goog-Api-Key").Single());
+        var fieldMask = capturedRequest.Headers.GetValues("X-Goog-FieldMask").Single();
+        Assert.Contains("routes.staticDuration", fieldMask);
+        Assert.DoesNotContain("navigationInstruction", fieldMask);
+        Assert.DoesNotContain("travelAdvisory", fieldMask);
         Assert.Contains("\"via\":true", capturedBody);
         Assert.True(capturedBody!.IndexOf("\"longitude\":10.1", StringComparison.Ordinal)
             > capturedBody.IndexOf("\"longitude\":10", StringComparison.Ordinal));

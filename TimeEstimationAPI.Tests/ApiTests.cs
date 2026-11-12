@@ -197,6 +197,9 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         var candidates1 = service.GenerateCandidateQueries("Salling Aarhus, Søndergade 27, 8000 Aarhus");
         Assert.Equal("Salling Aarhus, Søndergade 27, 8000 Aarhus", candidates1[0]);
         Assert.Contains("Søndergade 27, 8000 Aarhus", candidates1);
+        Assert.True(
+            Array.IndexOf(candidates1.ToArray(), "Søndergade 27, 8000 Aarhus")
+            < Array.IndexOf(candidates1.ToArray(), "Salling Aarhus, Søndergade 27"));
         Assert.Contains("Salling Aarhus, 8000 Aarhus", candidates1);
         Assert.DoesNotContain("8000 Aarhus", candidates1);
 

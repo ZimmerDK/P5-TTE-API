@@ -138,6 +138,7 @@ public sealed class RouteDataCollector(
             Provider = data.Provider,
             DistanceMeters = data.DistanceMeters,
             ProviderRouteTimeSeconds = data.ProviderRouteTimeSeconds,
+            StaticRouteTimeSeconds = data.StaticRouteTimeSeconds,
             RoadType = data.RoadType,
             SpeedLimitKmh = data.SpeedLimitKmh,
             TrafficSignalCount = data.TrafficSignalCount,

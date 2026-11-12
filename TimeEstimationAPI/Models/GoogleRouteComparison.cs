@@ -10,6 +10,7 @@ public sealed record GoogleRouteComparison
     /// <summary>Google route time minus the primary provider route estimate. Positive means Google is higher/slower.</summary>
     public double? GoogleVsProviderDeltaSeconds { get; init; }
     public double? GoogleDistanceMeters { get; init; }
+    public double? GoogleRouteTimeNoTrafficSeconds { get; init; }
     public IReadOnlyList<GoogleSegmentComparison> Segments { get; init; } = [];
 }
 

@@ -131,6 +131,7 @@ public sealed class ModelService
             GoogleVsModelDeltaSeconds = googleTotal.HasValue
                 ? googleTotal.Value - modelTotal
                 : null,
+            GoogleRouteTimeNoTrafficSeconds = google.StaticRouteTimeSeconds,
             Segments = googleSegments
         };
     }
