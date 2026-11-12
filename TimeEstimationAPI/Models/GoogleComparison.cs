@@ -2,16 +2,26 @@ namespace TimeEstimationAPI.Models;
 
 
 /// <summary>Compares the optional Google route with the primary provider and model.</summary>
-public sealed record GoogleRouteComparison
+public sealed record GoogleFullRouteData
 {
+    public double? GoogleDistanceMeters { get; init; }
     public double? GoogleRouteTimeSeconds { get; init; }
     /// <summary>Google route time minus the model route estimate. Positive means Google is higher/slower.</summary>
     public double? GoogleVsModelDeltaSeconds { get; init; }
     /// <summary>Google route time minus the primary provider route estimate. Positive means Google is higher/slower.</summary>
     public double? GoogleVsProviderDeltaSeconds { get; init; }
-    public double? GoogleDistanceMeters { get; init; }
     public double? GoogleRouteTimeNoTrafficSeconds { get; init; }
     public IReadOnlyList<GoogleSegmentComparison> Segments { get; init; } = [];
+}
+
+/// <summary>Route-level Google comparison values without the detailed segment list.</summary>
+public sealed record GoogleComparison
+{
+    public double? GoogleDistanceMeters { get; init; }
+    public double? GoogleRouteTimeSeconds { get; init; }
+    public double? GoogleVsModelDeltaSeconds { get; init; }
+    public double? GoogleVsProviderDeltaSeconds { get; init; }
+    public double? GoogleRouteTimeNoTrafficSeconds { get; init; }
 }
 
 /// <summary>Compares a primary route segment with a distance-weighted Google estimate.</summary>

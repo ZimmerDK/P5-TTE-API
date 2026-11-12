@@ -52,10 +52,12 @@ public sealed class FeatureTransformer
 
                 return (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
                 {
+                    // Zero represents unavailable data in the fixed model vector;
+                    // segment.MissingData indicates that it is not a measured zero.
                     ["road_class_id"] = roadClassId,
-                    ["lanes"] = Math.Max(segment.LaneCount ?? 1, 1),
+                    ["lanes"] = Math.Max(segment.LaneCount ?? 0, 0),
                     ["is_link"] = isLink,
-                    ["speed_limit_kmh"] = Math.Max(segment.SpeedLimitKmh ?? 50.0, 0),
+                    ["speed_limit_kmh"] = Math.Max(segment.SpeedLimitKmh ?? 0, 0),
                     ["bridge"] = segment.IsBridge == true ? 1 : 0,
                     ["tunnel"] = segment.IsTunnel == true ? 1 : 0,
                     ["roundabout"] = segment.IsRoundabout == true ? 1 : 0,
@@ -93,7 +95,7 @@ public sealed class FeatureTransformer
                     ["day_of_week"] = (int)localDeparture.DayOfWeek,
                     ["month"] = localDeparture.Month,
                     ["density"] = roadDensity,
-                    ["lane_count"] = Math.Max(segment.LaneCount ?? 1, 1),
+                    ["lane_count"] = Math.Max(segment.LaneCount ?? 0, 0),
                     ["internal_intersection"] = segment.IsIntersection == true ? 1 : 0
                 };
             })
@@ -107,8 +109,12 @@ public sealed class FeatureTransformer
         };
     }
 
-    private static double RoadTypeCode(string? roadType) =>
-        roadType?.ToLowerInvariant() switch
+    private static double RoadTypeCode(string? roadType)
+    {
+        if (string.IsNullOrWhiteSpace(roadType))
+            return 0;
+
+        return roadType.ToLowerInvariant() switch
         {
             "motorway" => 3,
             "trunk" => 2.5,
@@ -116,5 +122,6 @@ public sealed class FeatureTransformer
             "secondary" => 1.5,
             _ => 1
         };
+    }
 
 }

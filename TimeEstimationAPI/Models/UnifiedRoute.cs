@@ -58,7 +58,6 @@ public sealed record UnifiedRoute
     public required string Destination { get; init; }
     public IReadOnlyList<string> Via { get; init; } = [];
 
-    public IReadOnlyList<RouteSegment> Segments { get; init; } = [];
     public DateTimeOffset DepartureTime { get; init; }
     public double? DistanceMeters { get; init; }
     public string? RoadType { get; init; }
@@ -67,5 +66,6 @@ public sealed record UnifiedRoute
     public double? ProviderRouteTimeSeconds { get; init; }
     public string? SelectedProvider { get; init; }
     public IReadOnlyCollection<string> MissingData { get; init; } = [];
+    public IReadOnlyList<RouteSegment> Segments { get; init; } = [];
     public IReadOnlyList<RouteProviderData> ProviderData { get; init; } = [];
 }

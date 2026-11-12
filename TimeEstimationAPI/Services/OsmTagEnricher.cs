@@ -47,12 +47,12 @@ public sealed class OsmTagEnricher(
 
         if (!_options.UseOverpass)
         {
-            logger.LogInformation("Overpass OSM tag enrichment is disabled. Applying fallback tags.");
-            return ApplyFallbackTags(segments);
+            logger.LogInformation("Overpass OSM tag enrichment is disabled. Preserving unavailable OSM fields.");
+            return segments;
         }
 
         if (segments.All(segment => segment.Geometry.Count == 0))
-            return ApplyFallbackTags(segments);
+            return segments;
 
         // Query a narrow corridor around the route rather than a full route bounding box.
         var routePoints = SimplifyRoutePoints(segments);
@@ -74,93 +74,11 @@ public sealed class OsmTagEnricher(
 
         if (waysById.Count == 0)
         {
-            return ApplyFallbackTags(segments);
+            return segments;
         }
 
         var enriched = segments.Select(segment => EnrichSegment(segment, waysById.Values)).ToArray();
-        return ApplyFallbackTags(enriched);
-    }
-
-    /// <summary>
-    /// Evaluates route segments against missing attributes and applies dynamic fallback logic.<br/>
-    /// 1. Speed limit: If missing, calculates implied travel speed from OSRM distance and duration ((length / time) * 3.6),
-    ///    then snaps to standard legal speed limits (30, 40, 50, 70, 80, 90, 110, 130 km/h).<br/>
-    /// 2. Road type: If missing, infers classification from speed limit (>= 90 motorway, >= 70 primary, else secondary).<br/>
-    /// 3. Lane count: Defaults to 2 if unpopulated.
-    /// </summary>
-    private static IReadOnlyList<RouteSegment> ApplyFallbackTags(IReadOnlyList<RouteSegment> segments)
-    {
-        return segments.Select(segment =>
-        {
-            // 1. Calculate or preserve speed limit
-            var speedLimit = (segment.SpeedLimitKmh.HasValue && segment.SpeedLimitKmh.Value > 0)
-                ? segment.SpeedLimitKmh.Value
-                : (segment.LengthMeters > 0 && segment.ProviderSegmentTimeSeconds > 0)
-                    // Compute implied speed (m/s -> km/h) from OSRM step length/duration, then snap to legal speed limit
-                    ? SnapToStandardSpeedLimit((segment.LengthMeters.Value / segment.ProviderSegmentTimeSeconds.Value) * 3.6, segment.RoadType)
-                    : 50.0; // Fall back to baseline urban speed if metrics are unavailable
-
-            // 2. Infer or preserve road type
-            var roadType = !string.IsNullOrWhiteSpace(segment.RoadType)
-                ? segment.RoadType
-                : speedLimit switch
-                {
-                    >= 90 => "motorway",
-                    >= 70 => "primary",
-                    _ => "secondary"
-                };
-
-            // 3. Set or preserve lane count
-            var laneCount = (segment.LaneCount.HasValue && segment.LaneCount.Value > 0)
-                ? segment.LaneCount.Value
-                : 2;
-
-            // Remove populated fields from missingData array
-            var missing = segment.MissingData
-                .Where(field => field switch
-                {
-                    "roadType" => false,
-                    "speedLimitKmh" => false,
-                    "laneCount" => false,
-                    _ => true
-                })
-                .ToArray();
-
-            return segment with
-            {
-                RoadType = roadType,
-                SpeedLimitKmh = speedLimit,
-                LaneCount = laneCount,
-                MissingData = missing
-            };
-        }).ToArray();
-    }
-
-    private static double SnapToStandardSpeedLimit(double calculatedSpeedKmh, string? roadType)
-    {
-        static double Snap(double speed) => speed switch
-        {
-            <= 35 => 30.0,
-            <= 45 => 40.0,
-            <= 60 => 50.0,
-            <= 75 => 70.0,
-            <= 85 => 80.0,
-            <= 95 => 90.0,
-            <= 120 => 110.0,
-            _ => 130.0
-        };
-
-        var baseLimit = roadType switch
-        {
-            "motorway" or "motorway_link" => 110.0,
-            "primary" or "primary_link" or "trunk" or "trunk_link" => 80.0,
-            "secondary" or "secondary_link" or "tertiary" or "tertiary_link" => 50.0,
-            "residential" or "living_street" => 30.0,
-            _ => 50.0
-        };
-
-        var snapped = Snap(calculatedSpeedKmh);
-        return Math.Max(snapped, baseLimit);
+        return enriched;
     }
 
     private async Task<IReadOnlyList<OsmWay>?> FetchWaysAsync(

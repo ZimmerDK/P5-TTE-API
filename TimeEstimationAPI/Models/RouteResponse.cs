@@ -8,8 +8,9 @@ public sealed class RouteResponse
     public double? ProviderRouteTimeSeconds { get; set; }
     public string? RouteProvider { get; set; }
     public double RouteDistanceM { get; set; }
-    public GoogleRouteComparison? GoogleComparison { get; set; }
+    public GoogleComparison? GoogleComparison { get; set; }
     public string ModelName { get; set; } = "route_time_model_v1";
-    public UnifiedRoute? Route { get; set; }
     public Dictionary<string, object> Features { get; set; } = new();
+    public UnifiedRoute? Route { get; set; }
+    public GoogleFullRouteData? GoogleFullRouteData { get; set; }
 }

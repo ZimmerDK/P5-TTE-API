@@ -60,30 +60,42 @@ public sealed class ModelService
             }).ToArray()
         };
 
+        var googleFullRouteData = CreateGoogleFullRouteData(route, segmentPredictions);
         return new RouteResponse
         {
             ModelRouteTimeSeconds = segmentPredictions.Sum(),
             ProviderRouteTimeSeconds = route.ProviderRouteTimeSeconds,
             RouteProvider = route.SelectedProvider,
             RouteDistanceM = route.DistanceMeters ?? 0,
+            GoogleComparison = googleFullRouteData is null
+                ? null
+                : new GoogleComparison
+                {
+                    GoogleDistanceMeters = googleFullRouteData.GoogleDistanceMeters,
+                    GoogleRouteTimeSeconds = googleFullRouteData.GoogleRouteTimeSeconds,
+                    GoogleVsModelDeltaSeconds = googleFullRouteData.GoogleVsModelDeltaSeconds,
+                    GoogleVsProviderDeltaSeconds = googleFullRouteData.GoogleVsProviderDeltaSeconds,
+                    GoogleRouteTimeNoTrafficSeconds = googleFullRouteData.GoogleRouteTimeNoTrafficSeconds
+                },
             ModelName = prediction.ModelName,
-            GoogleComparison = CreateGoogleComparison(route, segmentPredictions),
             Route = route,
             Features = new Dictionary<string, object>
             {
-                ["distanceMeters"] = route.DistanceMeters ?? 0,
                 ["viaCount"] = route.Via.Count,
                 ["segmentCount"] = route.Segments.Count,
                 ["departureTime"] = request.DepartureTime,
                 ["source"] = request.Source ?? string.Empty,
                 ["destination"] = request.Destination ?? string.Empty,
+                ["via"] = request.Via ?? [],
+                ["distanceMeters"] = route.DistanceMeters ?? 0,
                 ["missingData"] = route.MissingData.Count > 0,
                 ["missingDataFields"] = route.MissingData
-            }
+            },
+            GoogleFullRouteData = googleFullRouteData
         };
     }
 
-    private static GoogleRouteComparison? CreateGoogleComparison(
+    private static GoogleFullRouteData? CreateGoogleFullRouteData(
         UnifiedRoute route,
         IReadOnlyList<double> modelSegmentTimes)
     {
@@ -112,24 +124,24 @@ public sealed class ModelService
                 GoogleTimeSeconds = googleTime,
                 ProviderTimeSeconds = providerTime,
                 ModelTimeSeconds = modelTime,
-                GoogleVsProviderDeltaSeconds = googleTime.HasValue && providerTime.HasValue
-                    ? googleTime.GetValueOrDefault() - providerTime.GetValueOrDefault()
-                    : null,
                 GoogleVsModelDeltaSeconds = googleTime.HasValue
                     ? googleTime.GetValueOrDefault() - modelTime
+                    : null,
+                GoogleVsProviderDeltaSeconds = googleTime.HasValue && providerTime.HasValue
+                    ? googleTime.GetValueOrDefault() - providerTime.GetValueOrDefault()
                     : null
             };
         }).ToArray();
 
-        return new GoogleRouteComparison
+        return new GoogleFullRouteData
         {
-            GoogleRouteTimeSeconds = googleTotal,
             GoogleDistanceMeters = google.DistanceMeters,
-            GoogleVsProviderDeltaSeconds = googleTotal.HasValue && providerTotal.HasValue
-                ? googleTotal.Value - providerTotal.Value
-                : null,
+            GoogleRouteTimeSeconds = googleTotal,
             GoogleVsModelDeltaSeconds = googleTotal.HasValue
                 ? googleTotal.Value - modelTotal
+                : null,
+            GoogleVsProviderDeltaSeconds = googleTotal.HasValue && providerTotal.HasValue
+                ? googleTotal.Value - providerTotal.Value
                 : null,
             GoogleRouteTimeNoTrafficSeconds = google.StaticRouteTimeSeconds,
             Segments = googleSegments

@@ -63,6 +63,7 @@ before changing routing, feature engineering, or model integration.
       per feature.
 - [x] Keep provider duration out of the model input; expose it only as a
       comparison/diagnostic value.
+- [x] Stop presenting fallback placeholder values for unavailable speed limits, lane counts, and road types as fetched data. Preserve missing-data provenance while keeping the fixed model feature vector compatible.
 
 ## Define time semantics
 - [ ] Decide whether departure-time features use UTC, the route's local

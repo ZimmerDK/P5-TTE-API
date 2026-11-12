@@ -255,6 +255,64 @@ public sealed class ProviderTests
         Assert.Contains("(around:50", WebUtility.UrlDecode(capturedQuery));
     }
 
+    [Fact]
+    public async Task OsmTagEnricher_preserves_missing_fields_when_disabled()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            throw new InvalidOperationException("Overpass should not be called when disabled.")));
+        var service = new OsmTagEnricher(
+            httpClient,
+            Options.Create(new OsmOptions { UseOverpass = false }),
+            NullLogger<OsmTagEnricher>.Instance,
+            new MemoryCache(Options.Create(new MemoryCacheOptions())));
+        var segment = new RouteSegment
+        {
+            Sequence = 0,
+            LengthMeters = 100,
+            ProviderSegmentTimeSeconds = 10,
+            MissingData = ["roadType", "speedLimitKmh", "laneCount"]
+        };
+
+        var result = await service.EnrichAsync([segment], CancellationToken.None);
+
+        var enriched = Assert.Single(result);
+        Assert.Null(enriched.RoadType);
+        Assert.Null(enriched.SpeedLimitKmh);
+        Assert.Null(enriched.LaneCount);
+        Assert.Contains("roadType", enriched.MissingData);
+        Assert.Contains("speedLimitKmh", enriched.MissingData);
+        Assert.Contains("laneCount", enriched.MissingData);
+    }
+
+    [Fact]
+    public void FeatureTransformer_keeps_missing_road_values_as_zero_model_features()
+    {
+        var route = new UnifiedRoute
+        {
+            Source = "A",
+            Destination = "B",
+            Segments =
+            [
+                new RouteSegment
+                {
+                    Sequence = 0,
+                    LengthMeters = 100,
+                    MissingData = ["roadType", "speedLimitKmh", "laneCount"]
+                }
+            ],
+            MissingData = ["roadType", "speedLimitKmh"]
+        };
+
+        var vector = new FeatureTransformer().Transform(route);
+        var features = Assert.Single(vector.SegmentFeatures);
+
+        Assert.Equal(0d, features["road_class_id"]);
+        Assert.Equal(0, features["lanes"]);
+        Assert.Equal(0d, features["speed_limit_kmh"]);
+        Assert.Equal(0, features["lane_count"]);
+        Assert.Equal(1d, vector.Sequence[0][^1]);
+    }
+
     // Long provider segments should get split up, while their total time and length stay the same.
     [Fact]
     public void RouteDataCollector_splits_long_segments_preserving_duration()

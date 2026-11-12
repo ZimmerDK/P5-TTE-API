@@ -224,7 +224,7 @@ if ($UseOsrm) {
 if ($UseOverpass) {
     Write-Host "Overpass OSM tag enrichment is enabled."
 } else {
-    Write-Host "Overpass OSM tag enrichment is disabled (using fallback tags)."
+    Write-Host "Overpass OSM tag enrichment is disabled (unavailable OSM fields remain missing)."
 }
 if ($UseContext) {
     Write-Host "Spatial context density enrichment is enabled (Context__Enabled = true)."
