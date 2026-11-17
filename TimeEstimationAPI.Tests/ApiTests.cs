@@ -10,21 +10,27 @@ using TimeEstimationAPI.Models;
 using TimeEstimationAPI.Services;
 using Xunit;
 
+[Trait("Category", "Integration")]
 public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly HttpClient _client;
+    private readonly WebApplicationFactory<Program> _factory;
 
     public ApiTests(WebApplicationFactory<Program> factory)
     {
-        _client = factory.WithWebHostBuilder(builder =>
+        _factory = factory;
+        _client = CreateClient(new TestModelRunner());
+    }
+
+    private HttpClient CreateClient(ITravelTimeModelRunner modelRunner) =>
+        _factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<ITravelTimeModelRunner>();
-                services.AddSingleton<ITravelTimeModelRunner, TestModelRunner>();
+                services.AddSingleton(modelRunner);
             });
         }).CreateClient();
-    }
 
     [Fact]
     public async Task Health_returns_ok()
@@ -92,6 +98,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    [Trait("Category", "Unit")]
     public void RouteRequest_reads_per_request_google_opt_out()
     {
         var request = JsonSerializer.Deserialize<RouteRequest>(
@@ -135,11 +142,8 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         var root = document.RootElement;
         Assert.Equal(2, root.GetProperty("route").GetProperty("segments").GetArrayLength());
         Assert.All(root.GetProperty("route").GetProperty("segments").EnumerateArray(),
-            segment => Assert.True(segment.GetProperty("modelSegmentTimeSeconds").GetDouble() > 0));
-        var total = root.GetProperty("modelRouteTimeSeconds").GetDouble();
-        var segmentTotal = root.GetProperty("route").GetProperty("segments").EnumerateArray()
-            .Sum(segment => segment.GetProperty("modelSegmentTimeSeconds").GetDouble());
-        Assert.Equal(segmentTotal, total, precision: 10);
+            segment => Assert.Equal(1, segment.GetProperty("modelSegmentTimeSeconds").GetDouble()));
+        Assert.Equal(2, root.GetProperty("modelRouteTimeSeconds").GetDouble());
     }
 
     [Fact]
@@ -191,6 +195,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    [Trait("Category", "Unit")]
     public void GeocodingService_generates_correct_fallback_candidates()
     {
         var service = new GeocodingService(new HttpClient(), NullLogger<GeocodingService>.Instance);
@@ -232,14 +237,112 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.DoesNotContain("USA", candidates5);
     }
 
-    private sealed class TestModelRunner : ITravelTimeModelRunner
+    [Fact]
+    public async Task Model_estimate_rejects_an_empty_segment_list()
+    {
+        var response = await _client.PostAsJsonAsync("/api/routes/model-only", new
+        {
+            segments = Array.Empty<object>(),
+            departureTime = "2026-09-24T08:30:00Z"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Invalid request", document.RootElement.GetProperty("title").GetString());
+        Assert.Contains("At least one segment", document.RootElement.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Model_estimate_rejects_null_segments()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/routes/model-only",
+            new { segments = (object?)null });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Estimate_treats_null_segments_as_an_empty_route_input()
+    {
+        var response = await _client.PostAsJsonAsync("/api/routes/estimate", new
+        {
+            source = "A",
+            destination = "B",
+            segments = (object?)null
+        });
+
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("development-stub",
+            document.RootElement.GetProperty("route").GetProperty("providerData")[0]
+                .GetProperty("provider").GetString());
+    }
+
+    [Fact]
+    public async Task Model_estimate_returns_bad_gateway_when_model_returns_wrong_segment_count()
+    {
+        using var client = CreateClient(new TestModelRunner([1], 1));
+        var response = await client.PostAsJsonAsync("/api/routes/model-only", new
+        {
+            segments = new[]
+            {
+                new { lengthMeters = 1000 },
+                new { lengthMeters = 500 }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Model service unavailable", document.RootElement.GetProperty("title").GetString());
+        Assert.Equal(
+            "The Python model service could not be reached or returned an invalid response.",
+            document.RootElement.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Model_estimate_returns_bad_gateway_when_model_returns_missing_segment_prediction()
+    {
+        using var client = CreateClient(new TestModelRunner([null], 0));
+        var response = await client.PostAsJsonAsync("/api/routes/model-only", new
+        {
+            segments = new[] { new { lengthMeters = 1000 } }
+        });
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Model service unavailable", document.RootElement.GetProperty("title").GetString());
+        Assert.Equal(
+            "The Python model service could not be reached or returned an invalid response.",
+            document.RootElement.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Estimate_removes_blank_via_locations_before_processing()
+    {
+        var response = await _client.PostAsJsonAsync("/api/routes/estimate", new
+        {
+            source = "A",
+            destination = "B",
+            via = new[] { "", "C", "  " },
+            departureTime = "2026-09-24T08:30:00Z"
+        });
+
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(1, document.RootElement.GetProperty("features").GetProperty("viaCount").GetInt32());
+    }
+
+    private sealed class TestModelRunner(
+        IReadOnlyList<double?>? segmentTimes = null,
+        double? routeTime = null) : ITravelTimeModelRunner
     {
         public Task<ModelPrediction> PredictAsync(
             RouteFeatureVector featureVector,
             CancellationToken cancellationToken) =>
             Task.FromResult(new ModelPrediction(
-                featureVector.Sequence.Length,
-                Enumerable.Repeat<double?>(1, featureVector.Sequence.Length).ToArray(),
+                routeTime ?? featureVector.Sequence.Length,
+                segmentTimes ?? Enumerable.Repeat<double?>(1, featureVector.Sequence.Length).ToArray(),
                 "test-model"));
     }
 }

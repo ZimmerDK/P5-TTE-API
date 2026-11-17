@@ -101,6 +101,46 @@ Use the Postman collection in `postman/` or `TimeEstimationAPI/TimeEstimationAPI
 
 ---
 
+## Tests
+Run the complete test suite with one command:
+```powershell
+.\Run-All-Tests.ps1
+```
+
+This runs:
+| Suite | Coverage |
+|---|---|
+| API tests | Unit and in-process integration tests |
+| ML tests | Python unit and ASGI integration tests |
+| Live provider tests | Public OSRM and Nominatim smoke tests |
+| E2E tests | Black-box tests against the local API and ML services |
+
+The script starts and stops the local services required by E2E tests. Use
+`-SkipLive`, `-SkipE2E`, or `-KeepServices` when needed.
+
+### Individual suites
+```powershell
+# API Tests (can filter by test category)
+dotnet test .\TimeEstimationAPI.Tests\TimeEstimationAPI.Tests.csproj --filter "Category=Unit"
+dotnet test .\TimeEstimationAPI.Tests\TimeEstimationAPI.Tests.csproj --filter "Category=Integration"
+
+# ML tests (install dependencies once) (can filter by category)
+.\ml-service\.venv\Scripts\python.exe -m pip install -r .\ml-service\requirements-dev.txt
+.\ml-service\.venv\Scripts\python.exe -m pytest .\ml-service\tests -q
+
+# Live providers
+dotnet test .\TimeEstimationAPI.LiveTests\TimeEstimationAPI.LiveTests.csproj
+
+# E2E tests (requires .\Start-LocalServices.ps1)
+dotnet test .\TimeEstimationAPI.E2ETests\TimeEstimationAPI.E2ETests.csproj
+```
+
+Live tests contact public services and may be rate-limited or temporarily unavailable. Google Maps is deliberately not contacted.
+
+For .NET category filtering, append `--filter "Category=Unit"` or `--filter "Category=Integration"`; ML tests use `-m unit` or `-m integration`.
+
+---
+
 ## Project Structure
 - [`TimeEstimationAPI/`](./TimeEstimationAPI/README.md) — ASP.NET Core web API handling routing provider integration, OSM enrichment, and feature formatting.
 - [`TimeEstimationAPI/Services/OsrmService.cs`](./TimeEstimationAPI/Services/OsrmService.cs) — OSRM integration and route-step parsing.

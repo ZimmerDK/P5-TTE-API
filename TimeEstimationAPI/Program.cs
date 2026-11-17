@@ -102,7 +102,11 @@ if (app.Environment.IsDevelopment())
 // Main route estimate endpoint: collect data, run the model, return the estimate and route used.
 app.MapPost("/api/routes/estimate", async (RouteRequest request, ModelService modelService, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
-    request = request with { Via = (request.Via ?? []).Where(value => !string.IsNullOrWhiteSpace(value)).ToList() };
+    request = request with
+    {
+        Via = (request.Via ?? []).Where(value => !string.IsNullOrWhiteSpace(value)).ToList(),
+        Segments = request.Segments ?? []
+    };
     if (request.Segments.Count == 0 &&
         (string.IsNullOrWhiteSpace(request.Source) || string.IsNullOrWhiteSpace(request.Destination)))
     {
@@ -131,7 +135,11 @@ app.MapPost("/api/routes/provider-data", async (
     RouteDataCollector routeDataCollector,
     CancellationToken cancellationToken) =>
 {
-    request = request with { Via = (request.Via ?? []).Where(value => !string.IsNullOrWhiteSpace(value)).ToList() };
+    request = request with
+    {
+        Via = (request.Via ?? []).Where(value => !string.IsNullOrWhiteSpace(value)).ToList(),
+        Segments = request.Segments ?? []
+    };
     if (string.IsNullOrWhiteSpace(request.Source) || string.IsNullOrWhiteSpace(request.Destination))
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -156,7 +164,11 @@ app.MapPost("/api/routes/model-only", async (
     ModelService modelService,
     CancellationToken cancellationToken) =>
 {
-    request = request with { Via = (request.Via ?? []).Where(value => !string.IsNullOrWhiteSpace(value)).ToList() };
+    request = request with
+    {
+        Via = (request.Via ?? []).Where(value => !string.IsNullOrWhiteSpace(value)).ToList(),
+        Segments = request.Segments ?? []
+    };
 
     var result = await modelService.EstimateSegmentsAsync(request, cancellationToken);
     return Results.Ok(result);

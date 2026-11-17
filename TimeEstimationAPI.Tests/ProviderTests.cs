@@ -7,6 +7,8 @@ using TimeEstimationAPI.Models;
 using TimeEstimationAPI.Services;
 using Xunit;
 
+[Trait("Category", "Provider")]
+[Trait("Category", "Unit")]
 public sealed class ProviderTests
 {
     // Makes sure we can turn a normal OSRM response into the route data we use.
@@ -117,6 +119,69 @@ public sealed class ProviderTests
             "numeric place");
 
         Assert.Equal(new RoutePoint(10.1, 55.2), point);
+    }
+
+    [Fact]
+    public async Task GeocodingService_rejects_malformed_json()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{not-json")
+            }));
+        var service = new GeocodingService(
+            httpClient,
+            NullLogger<GeocodingService>.Instance);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GeocodeAsync("https://nominatim.test/search", "malformed place"));
+
+        Assert.Contains("malformed place", exception.Message);
+    }
+
+    [Fact]
+    public async Task OsrmService_reports_http_failures()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+        var service = new OsrmService(
+            httpClient,
+            Options.Create(new OsmOptions { RoutingUrl = "https://osrm.test/route/v1/driving" }),
+            new StubGeocodingService());
+
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            service.GetRouteMetadataAsync("A", "B", null));
+    }
+
+    [Fact]
+    public async Task OsrmService_rejects_a_response_without_routes()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ =>
+            JsonResponse("""{"routes": []}""")));
+        var service = new OsrmService(
+            httpClient,
+            Options.Create(new OsmOptions { RoutingUrl = "https://osrm.test/route/v1/driving" }),
+            new StubGeocodingService());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GetRouteMetadataAsync("A", "B", null));
+
+        Assert.Contains("no routes", exception.Message);
+    }
+
+    [Fact]
+    public async Task OsrmService_propagates_request_cancellation()
+    {
+        using var httpClient = new HttpClient(new CancellationAwareHandler());
+        var service = new OsrmService(
+            httpClient,
+            Options.Create(new OsmOptions { RoutingUrl = "https://osrm.test/route/v1/driving" }),
+            new StubGeocodingService());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.GetRouteMetadataAsync("A", "B", null, cancellation.Token));
     }
 
     [Fact]
@@ -285,6 +350,7 @@ public sealed class ProviderTests
     }
 
     [Fact]
+    [Trait("Category", "Unit")]
     public void FeatureTransformer_keeps_missing_road_values_as_zero_model_features()
     {
         var route = new UnifiedRoute
@@ -313,8 +379,39 @@ public sealed class ProviderTests
         Assert.Equal(1d, vector.Sequence[0][^1]);
     }
 
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void FeatureTransformer_clamps_out_of_range_segment_values()
+    {
+        var route = new UnifiedRoute
+        {
+            Source = "A",
+            Destination = "B",
+            Segments =
+            [
+                new RouteSegment
+                {
+                    Sequence = 0,
+                    LengthMeters = -10,
+                    SpeedLimitKmh = 200,
+                    LaneCount = 20
+                }
+            ]
+        };
+
+        var vector = new FeatureTransformer().Transform(route);
+        var features = Assert.Single(vector.SegmentFeatures);
+
+        Assert.Equal(0d, vector.Sequence[0][0]);
+        Assert.Equal(1d, vector.Sequence[0][1]);
+        Assert.Equal(0d, features["length_m"]);
+        Assert.Equal(200d, features["speed_limit_kmh"]);
+        Assert.Equal(20, features["lanes"]);
+    }
+
     // Long provider segments should get split up, while their total time and length stay the same.
     [Fact]
+    [Trait("Category", "Unit")]
     public void RouteDataCollector_splits_long_segments_preserving_duration()
     {
         var result = RouteDataCollector.SplitSegments(
@@ -335,6 +432,47 @@ public sealed class ProviderTests
         Assert.All(result, segment => Assert.Equal("primary", segment.RoadType));
     }
 
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void RouteDataCollector_keeps_a_segment_at_the_maximum_length_unsplit()
+    {
+        var result = RouteDataCollector.SplitSegments(
+        [
+            new RouteSegment { LengthMeters = 200, ProviderSegmentTimeSeconds = 12 }
+        ], 200);
+
+        var segment = Assert.Single(result);
+        Assert.Equal(200, segment.LengthMeters);
+        Assert.Equal(12, segment.ProviderSegmentTimeSeconds);
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void RouteDataCollector_distributes_just_over_maximum_length_evenly()
+    {
+        var result = RouteDataCollector.SplitSegments(
+        [
+            new RouteSegment { LengthMeters = 201, ProviderSegmentTimeSeconds = 12 }
+        ], 200);
+
+        Assert.Equal(2, result.Count);
+        Assert.All(result, segment => Assert.Equal(100.5, segment.LengthMeters));
+        Assert.All(result, segment => Assert.Equal(6, segment.ProviderSegmentTimeSeconds));
+    }
+
+    [Fact]
+    [Trait("Category", "Unit")]
+    public void RouteDataCollector_keeps_zero_length_segments_without_splitting()
+    {
+        var result = RouteDataCollector.SplitSegments(
+        [
+            new RouteSegment { LengthMeters = 0, ProviderSegmentTimeSeconds = 0 }
+        ], 200);
+
+        var segment = Assert.Single(result);
+        Assert.Equal(0, segment.LengthMeters);
+    }
+
     private static HttpResponseMessage JsonResponse(string content) =>
         new(HttpStatusCode.OK)
         {
@@ -349,6 +487,14 @@ public sealed class ProviderTests
             HttpRequestMessage request,
             CancellationToken cancellationToken) =>
             Task.FromResult(responseFactory(request));
+    }
+
+    private sealed class CancellationAwareHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromCanceled<HttpResponseMessage>(cancellationToken);
     }
 
     private sealed class StubGeocodingService : IGeocodingService
