@@ -61,9 +61,24 @@ def load_model() -> Any:
     return joblib.load(model_path)
 
 
+def load_model_config() -> dict[str, Any] | None:
+    """
+    The training pipeline saves <model>_config.json next to <model>.json. It says how the model
+    output becomes seconds (target transform, time-of-day factor). Older models have none and
+    already predict seconds.
+    """
+    config_path = os.path.splitext(_model_path())[0] + "_config.json"
+    if not os.path.isfile(config_path):
+        return None
+    import json
+    with open(config_path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     application.state.model = load_model()
+    application.state.model_config = load_model_config()
     yield
 
 
@@ -88,6 +103,8 @@ def model_info() -> dict[str, Any]:
         "inputMode": os.environ.get("MODEL_INPUT_MODE", "segments"),
         "configuredFeatures": _configured_feature_names(),
         "modelFeatures": feature_names,
+        "targetTransform": (getattr(app.state, "model_config", None) or {}).get("target_transform"),
+        "hasTimeFactor": (getattr(app.state, "model_config", None) or {}).get("time_factor") is not None,
     }
 
 
@@ -101,6 +118,9 @@ def predict(request: PredictionRequest) -> PredictionResponse:
 
     try:
         predictions = _predict(model, request)
+        model_config = getattr(app.state, "model_config", None)
+        if model_config is not None:
+            predictions = _to_seconds(np.asarray(predictions, dtype=float), request.segment_features, model_config)
     except (TypeError, ValueError, KeyError) as exception:
         raise HTTPException(status_code=422, detail=f"Model input was rejected: {exception}") from exception
 
@@ -139,6 +159,37 @@ def _predict(model: Any, request: PredictionRequest) -> Any:
         raise ValueError("MODEL_INPUT_MODE must be 'route' or 'segments'.")
 
     return model.predict(model_input)
+
+
+def _to_seconds(values: np.ndarray, segments: list[dict[str, Any]], config: dict[str, Any]) -> np.ndarray:
+    """
+    Turns the model output into seconds per segment, as described in the model's config:
+    undo the target transform, then multiply by the time-of-day factor for the segment's
+    weekday/weekend and hour. Mirrors predictSeconds/applyTimeFactor in aSTEP_MLM/scripts/MLMscript.py.
+    """
+    if os.environ.get("MODEL_INPUT_MODE", "segments").lower() != "segments":
+        raise ValueError("A model with a target transform or time factor needs MODEL_INPUT_MODE=segments.")
+
+    transform = config.get("target_transform")
+    if transform == "log_time":
+        values = np.exp(values)
+    elif transform == "log_speed":
+        length_feature = config["length_feature"]
+        lengths = np.array([float(segment[length_feature]) for segment in segments])
+        values = np.maximum(lengths, config["min_length_m"]) / np.exp(values)
+    elif transform is not None:
+        raise ValueError(f"Unknown target transform in the model config: {transform}")
+
+    factor = config.get("time_factor")
+    if factor is not None:
+        hours = [int(segment["hour_enter_time"]) for segment in segments]
+        weekends = [bool(segment.get("weekend_enter_time", 0)) for segment in segments]
+        values = values * np.array([
+            factor["weekend" if weekend else "weekday"][hour]
+            for hour, weekend in zip(hours, weekends)
+        ])
+
+    return values
 
 
 def _get_model_feature_names(model: Any) -> list[str] | None:
