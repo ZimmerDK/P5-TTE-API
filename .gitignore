@@ -12,6 +12,7 @@ __pycache__/
 .coverage.*
 htmlcov/
 TestResults/
+.test-results-temp/
 
 ml-service/.venv/
 ml-service/.env
